@@ -6,6 +6,8 @@ test: test.h5
 	../src/ibddb dict $< 
 	../src/ibddb markers $< | head 
 	../src/ibddb markers -r "22:17202602-17221494" $<
+	../src/ibddb ped $<
+	../src/ibddb pairs $<
 
 test.h5: ibdexecutable reference.dict markers.bed ibd.txt LAP.fam
 	../src/ibddb build \

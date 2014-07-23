@@ -32,6 +32,7 @@ THE SOFTWARE.
 #define DATASET_PAIRS "/pairs"
 #define DATASET_IBD "/ibd"
 #define DATASET_MARKERS "/markers"
+#define DATASET_PEDIGREE "/pedigree"
 
 static int MarkerCompareByChromName(const void* a,const void *b)
 	{
@@ -454,7 +455,7 @@ static void readPed(ContextPtr ctx)
 	/* create dataset */
 	int dataset_id = H5Dcreate2(
 			ctx->file_id,
-			  "/pedigree",
+			  DATASET_PEDIGREE,
 			  pedigreetype,
 			  dataspace_id, 
                           H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -751,6 +752,21 @@ static int main_build(int argc,char** argv)
 	}
 
 
+#define LOAD_CONFIG_DATASET(DATASETNAME,DATATYPE,ITEM_NAME,ITEM_COUNT) \
+		DEBUG("Loading " DATASETNAME); \
+		hid_t dataset_id = VERIFY(H5Dopen(config->file_id,DATASETNAME, H5P_DEFAULT)); \
+		hid_t dspace = VERIFY(H5Dget_space(dataset_id)); \
+		assert(H5Sget_simple_extent_ndims(dspace)==1); \
+		int atype  = H5Dget_type(dataset_id);  \
+		hsize_t dims[1]; \
+		H5Sget_simple_extent_dims(dspace, dims, NULL); \
+		config->ITEM_COUNT = dims[0]; \
+		config->ITEM_NAME = (DATATYPE*)safeCalloc(config->ITEM_COUNT,sizeof(DATATYPE)); \
+		VERIFY(H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->ITEM_NAME)); \
+		VERIFY(H5Sclose(dspace)); \
+		VERIFY(H5Dclose(dataset_id)); \
+		DEBUG("End reading " DATASETNAME)
+
 void ContextOpenForRead(ContextPtr config)
 	{
 	DEBUG("Opening HDF5 file %s",config->hdf5_filename );
@@ -761,53 +777,20 @@ void ContextOpenForRead(ContextPtr config)
 		}
 	if( config->on_read_load_dict )
 		{
-		DEBUG("Loading dictionary " DATASET_DICTIONARY);
-
-		// http://stackoverflow.com/questions/15786626/get-the-dimensions-of-a-hdf5-dataset
-		hid_t dataset_id =H5Dopen(config->file_id, DATASET_DICTIONARY, H5P_DEFAULT);
-		hid_t dspace = H5Dget_space(dataset_id);
-
-		assert(H5Sget_simple_extent_ndims(dspace)==1);
-
-		int atype  = H5Dget_type(dataset_id); 
-		hsize_t dims[1];
-		H5Sget_simple_extent_dims(dspace, dims, NULL);
-		//DEBUG("type = %d dims:%d N=%d\n",atype,ndims,dims[0]);
-		
-		config->chromosome_count=dims[0];
-		config->chromosomes = (ChromPtr)safeCalloc(config->chromosome_count,sizeof(Chrom));
-		
-		H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->chromosomes);
-		
-		H5Sclose(dspace);
-		H5Dclose(dataset_id);
-		DEBUG("end reading dict");
+		LOAD_CONFIG_DATASET(DATASET_DICTIONARY,Chrom,chromosomes,chromosome_count);
 		}
 
 	if( config->on_read_load_markers )
 		{
-		DEBUG("Loading " DATASET_MARKERS);
-
-		// http://stackoverflow.com/questions/15786626/get-the-dimensions-of-a-hdf5-dataset
-		hid_t dataset_id = VERIFY(H5Dopen(config->file_id, DATASET_MARKERS, H5P_DEFAULT));
-		hid_t dspace = VERIFY(H5Dget_space(dataset_id));
-
-		assert(H5Sget_simple_extent_ndims(dspace)==1);
-
-		int atype  = H5Dget_type(dataset_id); 
-		hsize_t dims[1];
-		H5Sget_simple_extent_dims(dspace, dims, NULL);
-		DEBUG("type = %d  N=%d\n",atype,dims[0]);
-		
-		config->marker_count=dims[0];
-
-		config->markers = (MarkerPtr)safeCalloc(config->marker_count,sizeof(Marker));
-
-		H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->markers);
-
-		H5Sclose(dspace);
-		H5Dclose(dataset_id);
-		DEBUG("end reading " DATASET_MARKERS);
+		LOAD_CONFIG_DATASET(DATASET_MARKERS,Marker,markers,marker_count);
+		}
+	if( config->on_read_load_pedigree )
+		{
+		LOAD_CONFIG_DATASET(DATASET_PEDIGREE,Individual,individuals,individual_count);
+		}
+	if( config->on_read_load_pairs )
+		{
+		LOAD_CONFIG_DATASET(DATASET_PAIRS,PairIndi,pairs,pair_count);
 		}
 	}
 
@@ -988,6 +971,134 @@ static int main_markers(int argc,char** argv)
 	return EXIT_SUCCESS;
 	}
 
+static void printIndividual(const IndividualPtr individual,FILE* out)
+	{
+	fputs( individual->family , out);
+	fputc('\t',out);
+	fputs( individual->name , out);
+	fputc('\t', out);
+
+	if(individual->father==NULL)
+		{
+		fputc('0', out);
+		}
+	else
+		{
+		fputs( individual->father , out);
+		}
+	fputc('\t', out);
+	if(individual->mother==NULL)
+		{
+		fputc('0', out);
+		}
+	else
+		{
+		fputs( individual->mother , out);
+		}
+	fputc('\t', out);
+	fprintf(out,"%d", individual->sex);
+	fputc('\t', out);
+	fprintf(out,"%d", individual->status);
+	}
+
+
+static int main_pedigree(int argc,char** argv)
+	{
+	size_t i;
+	ContextPtr config=ContextNew(argc,argv);
+	config->on_read_load_pedigree = 1;
+	
+	for(;;)
+		{
+		struct option long_options[] =
+		     {
+		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
+
+		       {0, 0, 0, 0}
+		     };
+		 /* getopt_long stores the option index here. */
+		int option_index = 0;
+	     	int c = getopt_long (argc, argv, "",
+		                    long_options, &option_index);
+		if(c==-1) break;
+		switch(c)
+			{
+			case 0: break;
+			case '?': break;
+			default: exit(EXIT_FAILURE); break;
+			}
+		}	
+	if(optind+1!=argc)
+		{
+		fprintf(stderr,"Illegal number of arguments.\n");
+		return EXIT_FAILURE;
+		}	
+	config->hdf5_filename=argv[optind];
+	ContextOpenForRead(config);
+	
+
+	for(i=0;i< config->individual_count;++i)
+		{
+		IndividualPtr individual = &config->individuals[i];
+		
+		
+		printIndividual(individual,config->out);
+		if( fputc('\n', config->out) < 0) break;
+		}
+
+	ContextFree(config);
+	return EXIT_SUCCESS;
+	}
+
+static int main_pairs(int argc,char** argv)
+	{
+	size_t i;
+	ContextPtr config=ContextNew(argc,argv);
+	config->on_read_load_pedigree = 1;
+	config->on_read_load_pairs = 1;
+	
+	for(;;)
+		{
+		struct option long_options[] =
+		     {
+		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
+
+		       {0, 0, 0, 0}
+		     };
+		 /* getopt_long stores the option index here. */
+		int option_index = 0;
+	     	int c = getopt_long (argc, argv, "",
+		                    long_options, &option_index);
+		if(c==-1) break;
+		switch(c)
+			{
+			case 0: break;
+			case '?': break;
+			default: exit(EXIT_FAILURE); break;
+			}
+		}	
+	if(optind+1!=argc)
+		{
+		fprintf(stderr,"Illegal number of arguments.\n");
+		return EXIT_FAILURE;
+		}	
+	config->hdf5_filename=argv[optind];
+	ContextOpenForRead(config);
+	
+
+	for(i=0;i< config->pair_count;++i)
+		{
+		int j;
+		PairIndiPtr pair = &config->pairs[i];
+		printIndividual(&config->individuals[pair->indi1idx],config->out);
+		fputc('\t', config->out);
+		printIndividual(&config->individuals[pair->indi2idx],config->out);
+		if( fputc('\n', config->out) < 0) break;
+		}
+
+	ContextFree(config);
+	return EXIT_SUCCESS;
+	}
 
 
 int main(int argc,char** argv)
@@ -1006,6 +1117,14 @@ int main(int argc,char** argv)
 		else if(strcmp("markers",argv[1])==0)
 			{
 			status= main_markers(argc-1,&argv[1]);
+			}
+		else if(strcmp("ped",argv[1])==0)
+			{
+			status= main_pedigree(argc-1,&argv[1]);
+			}
+		else if(strcmp("pairs",argv[1])==0)
+			{
+			status= main_pairs(argc-1,&argv[1]);
 			}
 		else
 			{

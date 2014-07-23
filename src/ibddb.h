@@ -109,6 +109,8 @@ typedef struct context_t
 	/** reading flag */
 	boolean_t on_read_load_dict;
 	boolean_t on_read_load_markers;
+	boolean_t on_read_load_pedigree;
+	boolean_t on_read_load_pairs;
 	} Context,*ContextPtr;
 
 
