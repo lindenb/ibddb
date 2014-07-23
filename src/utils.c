@@ -22,15 +22,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 */
+
 #include "utils.h"
 
 char* safeStrDup(const char* src)
 	{
 	char* p=strdup(src);
-	if(src==NULL) DIE_FAILURE("strdup failed");
+	if(p==NULL) DIE_FAILURE("strdup failed");
 	return p;
 	}
 
+char* safeStrNDup(const char* s,size_t n)
+	{
+	size_t len = strlen(s);
+  	char *result;
+	if(len<n) n=len;	
+	result=(char *)safeMalloc (n + 1);
+  	result[n] = '\0';
+  	return memcpy ((void*)result,(void*)s, n);
+	}
 
 size_t strsplit(char* src,char delim,char** offsets,size_t max_tokens)
 	{

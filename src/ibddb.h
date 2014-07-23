@@ -29,6 +29,10 @@ THE SOFTWARE.
 #include "utils.h"
 
 
+
+/** just a flag to map the type as transient (not saved in HDF5 file )*/
+#define TRANSIENT(type) type
+
 typedef struct chrom_t
 	{
 	char* name;
@@ -43,6 +47,7 @@ typedef struct marker_t
 	int tid;
 	int position;
 	int index;
+	//TRANSIENT(boolean_t) selected;
 	} Marker,*MarkerPtr;
 
 
@@ -55,6 +60,7 @@ typedef struct individual_t
 	int sex;
 	int status;
 	int index;
+	TRANSIENT(boolean_t) selected;
 	} Individual,*IndividualPtr;
 
 typedef struct pair_id
@@ -62,9 +68,15 @@ typedef struct pair_id
 	int indi1idx;
 	int indi2idx;
 	int index;
+	TRANSIENT(boolean_t) selected;
 	} PairIndi,*PairIndiPtr;
 
-
+typedef struct region_id
+	{
+	int tid;
+	int start;
+	int end;
+	} Region,*RegionPtr;
 
 typedef struct context_t
 	{
@@ -90,7 +102,15 @@ typedef struct context_t
 	/** pairs **/
 	PairIndiPtr pairs;
 	size_t pair_count;
+
+	/* default output file */
+	FILE* out;
+
+	/** reading flag */
+	boolean_t on_read_load_dict;
+	boolean_t on_read_load_markers;
 	} Context,*ContextPtr;
+
 
 
 

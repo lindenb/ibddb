@@ -4,12 +4,7 @@ CFLAGS= -g -Wall -I/commun/data/packages/hdf5/include
 LDFLAGS= -L/commun/data/packages/hdf5/lib
 LIBS=-lz -lhdf5
 
-all: test3D ##test ibddb
-
-test3D: test3d.c
-	$(CC) -o a.out $(CFLAGS) $^ $(LDFLAGS) $(LIBS) && \
-	./a.out && \
-	/commun/data/packages/hdf5/bin/h5dump test.h5
+all: ibddb
 
 ibddb: utils.o ibddb.o
 	$(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)	
@@ -19,15 +14,6 @@ ibddb.o : ibddb.c ibddb.h  utils.h
 
 utils.o : utils.c utils.h
 	$(CC) -c -o $@ $(CFLAGS) $<
-
-test: ibddb
-	LD_LIBRARY_PATH=/commun/data/packages/hdf5/lib ./ibddb build \
-		-o jeter.h5 \
-		--dict /commun/data/pubdb/broadinstitute.org/bundle/1.5/b37/human_g1k_v37.fasta.fai \
-		--bed markers.bed.gz \
-		--ped LAP.fam \
-		--ibd ibd.tx && \
-	LD_LIBRARY_PATH=/commun/data/packages/hdf5/lib ./ibddb query jeter.h5 
 
 clean:
 	rm -f *.o ibddb

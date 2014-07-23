@@ -31,6 +31,8 @@ THE SOFTWARE.
 #include <string.h>
 #include <zlib.h>
 
+typedef signed char boolean_t;
+
 /* gz file */
 gzFile safeGZOpen(const char *path, const char *mode);
 char* gzReadLine(gzFile in,size_t *str_size);
@@ -38,6 +40,7 @@ char* gzReadLine(gzFile in,size_t *str_size);
 /* string */
 size_t strsplit(char* src,char delim,char** offsets,size_t max_tokens);
 char* safeStrDup(const char* src);
+char* safeStrNDup(const char* src,size_t n);
 
 /** stdlib */
 void* _safeMalloc(const char*,int,size_t);
@@ -49,9 +52,9 @@ void* _safeRealloc(const char*,int,void*,size_t);
 #define safeRealloc(p,n) _safeRealloc(__FILE__,__LINE__,p,n)
 
 
-#define WHERENL fprintf(stderr,"[%s]:%d ",__FILE__,__LINE__)
+#define WHERENL fprintf(stderr,"[%s:%d] ",__FILE__,__LINE__)
 #define DIE_FAILURE(FormatLiteral,...) do { WHERENL; fprintf (stderr,"Exiting: " FormatLiteral "\n", ##__VA_ARGS__); exit(EXIT_FAILURE);} while(0)
-#define DEBUG(FormatLiteral, ...)  do { WHERENL; fprintf (stderr,"" FormatLiteral "\n", ##__VA_ARGS__);} while(0)
+#define DEBUG(FormatLiteral, ...)  do { fputs("[DEBUG]",stderr); WHERENL; fprintf (stderr,"" FormatLiteral "\n", ##__VA_ARGS__);} while(0)
 
 #ifndef MIN 
 #define MIN(a,b) (a<b ? a: b)
@@ -59,6 +62,14 @@ void* _safeRealloc(const char*,int,void*,size_t);
 #ifndef MAX 
 #define MAX(a,b) (a>b ? a: b)
 #endif
+
+#ifndef TRUE 
+#define TRUE (1)
+#endif
+#ifndef FALSE 
+#define FALSE (0)
+#endif
+
 
 
 static inline int _assertGT0(const char* fnamen,int line,int status)
@@ -81,5 +92,6 @@ static inline int _assertGE0(const char* fnamen,int line,int status)
 	}
 #define assertGT0(status) _assertGT0(__FILE__,__LINE__,status)
 #define assertGE0(status) _assertGE0(__FILE__,__LINE__,status)
+#define VERIFY(status) assertGE0(status)
 #endif
 

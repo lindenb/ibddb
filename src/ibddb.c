@@ -24,9 +24,14 @@ THE SOFTWARE.
 */
 #include <unistd.h>
 #include <getopt.h>
+#include <inttypes.h>
+#include <assert.h>
 #include "ibddb.h"
 
 #define DATASET_DICTIONARY "/dictionary"
+#define DATASET_PAIRS "/pairs"
+#define DATASET_IBD "/ibd"
+#define DATASET_MARKERS "/markers"
 
 static int MarkerCompareByChromName(const void* a,const void *b)
 	{
@@ -68,6 +73,17 @@ static ChromPtr findChromosomeByName(ContextPtr ctx,const char* cname)
 		}
 	return NULL;
 	}
+
+static ChromPtr findExistingChromosomeByName(ContextPtr ctx,const char* cname)
+	{
+	ChromPtr c=findChromosomeByName(ctx,cname);
+	if(c==NULL)
+		{
+		DIE_FAILURE("Cannot find chromosome \"%s\" in dictionary.\n",cname);
+		}
+	return c;
+	}
+
 
 static IndividualPtr findIndividualByFamName(ContextPtr ctx,const char* fam,const char* indi)
 	{
@@ -112,7 +128,7 @@ static void readIbd(ContextPtr ctx)
 	
 	if(ctx->ibd_filename==NULL)
 		{
-		DIE_FAILURE("config.ibd_filename undefined.\n");
+		DIE_FAILURE("config->ibd_filename undefined.\n");
 		}
 	DEBUG("Opening IBD %s",ctx->ibd_filename);
 	in1=safeGZOpen(ctx->ibd_filename,"r");
@@ -201,7 +217,7 @@ static void readIbd(ContextPtr ctx)
 	/* create dataset */
 	int dataset_id = H5Dcreate2(
 			ctx->file_id,
-			  "/pairs",
+			  DATASET_PAIRS,
 			  pairtype,
 			  dataspace_id, 
                           H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -220,15 +236,15 @@ static void readIbd(ContextPtr ctx)
 	
 	{
 	hid_t plist;  /* property list */
-
-	hsize_t  dims[3] = {ctx->pair_count,ctx->marker_count,3};
-
+	hsize_t  dims_memory[3]={1,1,3};
+	hsize_t  dims[3] = {ctx->marker_count,ctx->pair_count,3};
+	hid_t  memspace  = H5Screate_simple(3, dims_memory, NULL); 
 	
 
 	int dataspace_id =  H5Screate_simple (3,dims, NULL);
 	int dataset_id = H5Dcreate2(
 			ctx->file_id,
-			  "/ibd",
+			  DATASET_IBD,
 			  H5T_NATIVE_FLOAT,
 			  dataspace_id, 
                           H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -247,9 +263,10 @@ static void readIbd(ContextPtr ctx)
 			IndividualPtr p1;
 			IndividualPtr p2;
 			PairIndi key;
+			float ibd_values[3]={0.0f,0.0f,0.0f};
 			PairIndiPtr found;
 			char* tokens[9];
-			if(strsplit(line,'\t',tokens,9)<9)
+			if(strsplit(line,'\t',tokens,10)<9)
 				{
 				DIE_FAILURE("BOUM IBD in %s",line1);
 				}
@@ -282,7 +299,7 @@ static void readIbd(ContextPtr ctx)
 					); 
 				}
 				
-			int pair_index=found->index;
+
 			
 			/* get the chromosome and its' index */
 			if(prev_chrom==NULL || strcmp(prev_chrom->name,tokens[4])!=0)
@@ -310,25 +327,44 @@ static void readIbd(ContextPtr ctx)
 			
 			for(i=0;i< 3;++i)
 				{
-				hsize_t write_start[3] = {pair_index,marker->index,i};
-  				hsize_t write_count[3] = {1,1,1};
-				/* assertGE0(H5Sselect_hyperslab (
-					dataspace_id,
-					H5S_SELECT_SET,
-					write_start,
-					NULL,
-					write_count,
-					NULL
-					));*/
-				float ibd = atof(tokens[6+i]);
-				/* H5Dwrite(dataspace_id,
-					H5T_NATIVE_FLOAT,
-					H5S_ALL,
-					H5S_ALL,
-					H5P_DEFAULT,
-					&ibd
-					);	*/		
+				char* p2;
+				ibd_values[i]=(float)strtod(tokens[6+i],&p2);
+				if((*p2!=0))
+					{
+					DIE_FAILURE("bad ibd value column $%d in %s after '%s'. ",
+						(6+i+1),tokens[6+i],p2);
+					}
+				if(ibd_values[i]<0.0f || ibd_values[i]>1.0f)
+					{
+					DEBUG("%f %f ",atof("0.9663"),strtof("0.9663",NULL));
+					DIE_FAILURE("Column $%d : bad ibd value =%f in \"%s\".",
+						(6+i+1),ibd_values[i],tokens[6+i]);
+					}
 				}
+			
+			hsize_t write_start[3] = {marker->index,found->index,0};
+			hsize_t write_count[3] = {1,1,3};
+			
+			assert(write_start[0] < ctx->marker_count);
+			assert(write_start[1] < ctx->pair_count);
+
+			
+			VERIFY(H5Sselect_hyperslab(
+				dataspace_id,
+				H5S_SELECT_SET,
+				write_start, NULL, 
+				write_count, NULL
+				));
+			
+			VERIFY(H5Dwrite(
+				dataset_id,
+				H5T_NATIVE_FLOAT,
+				memspace,
+				dataspace_id,
+				H5P_DEFAULT,
+				ibd_values
+				));
+		
 			free(line);
 			}
 
@@ -336,7 +372,8 @@ static void readIbd(ContextPtr ctx)
 		free(line1);		
 		}
 	gzclose(in1);
-
+	
+	H5Sclose(memspace);
 	H5Dclose(dataset_id);
 	H5Sclose(dataspace_id);
 
@@ -358,9 +395,9 @@ static void readPed(ContextPtr ctx)
 
 	if(ctx->ped_filename==NULL)
 		{
-		DIE_FAILURE("config.ped_filename undefined.\n");
+		DIE_FAILURE("config->ped_filename undefined.\n");
 		}
-	DEBUG("Opening PED %s",ctx->ped_filename);
+	DEBUG("Opening PED \"%s\"",ctx->ped_filename);
 	in=safeGZOpen(ctx->ped_filename,"r");
 	while((line=gzReadLine(in,&line_len))!=NULL)
 		{
@@ -447,7 +484,7 @@ static void readBed(ContextPtr ctx)
 
 	if(ctx->bed_filename==NULL)
 		{
-		DIE_FAILURE("config.bed_filename undefined.\n");
+		DIE_FAILURE("config->bed_filename undefined.\n");
 		}
 	DEBUG("Opening BED %s",ctx->bed_filename);
 	in=safeGZOpen(ctx->bed_filename,"r");
@@ -523,7 +560,7 @@ static void readBed(ContextPtr ctx)
 	/* create dataset */
 	int dataset_id = H5Dcreate2(
 			ctx->file_id,
-			  "/markers",
+			  DATASET_MARKERS,
 			  markertype,
 			  dataspace_id, 
                           H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -558,7 +595,7 @@ static void readFaidx(ContextPtr ctx)
 	gzFile in;
 	if(ctx->faidx_filename==NULL)
 		{
-		DIE_FAILURE("config.faidx_filename undefined.\n");
+		DIE_FAILURE("config->faidx_filename undefined.\n");
 		}
 	DEBUG("Opening FAIDX %s",ctx->faidx_filename);
 	in=safeGZOpen(ctx->faidx_filename,"r");
@@ -636,24 +673,28 @@ static void readFaidx(ContextPtr ctx)
 	//assertGE0(H5Dclose(faidx_dataset_id));*/
 	}
 
-
+static ContextPtr ContextNew(int argc,char** argv)
+	{
+	ContextPtr config=(ContextPtr)safeCalloc(1,sizeof(Context));
+	config->argc = argc;
+	config->argv = argv;
+	config->out = stdout;
+	return config;
+	}
 
 
 static int main_build(int argc,char** argv)
 	{
 	
 	int status;
-	Context config;
-	memset((void*)&config,0,sizeof(Context));
-	config.argc=argc;
-	config.argv=argv;
+	ContextPtr config = ContextNew(argc,argv);
 
 	
 	for(;;)
 		{
 		struct option long_options[] =
 		     {
-		      // {"enable-self-self",  no_argument , &config.enable_self_self , 1},
+		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
 			{"out",    required_argument, 0, 'o'},
  			{"dict",    required_argument, 0, 'D'},
 			{"bed",    required_argument, 0, 'b'},
@@ -668,118 +709,287 @@ static int main_build(int argc,char** argv)
 		if(c==-1) break;
 		switch(c)
 			{
-			case 'o': config.hdf5_filename=optarg;break;
-			case 'D': config.faidx_filename=optarg;break;
-			case 'b': config.bed_filename=optarg;break;
-			case 'p': config.ped_filename=optarg;break;
-			case 'i': config.ibd_filename=optarg;break;
+			case 'o': config->hdf5_filename=optarg;break;
+			case 'D': config->faidx_filename=optarg;break;
+			case 'b': config->bed_filename=optarg;break;
+			case 'p': config->ped_filename=optarg;break;
+			case 'i': config->ibd_filename=optarg;break;
 			case 0: break;
 			case '?': break;
 			default: exit(EXIT_FAILURE); break;
 			}
 		}
-	if(config.hdf5_filename==NULL)
+	if(config->hdf5_filename==NULL)
 		{
-		DIE_FAILURE("config.hdf5_filename undefined.\n");
+		DIE_FAILURE("config->hdf5_filename undefined.\n");
 		}
-	if(config.bed_filename==NULL)
+	if(config->bed_filename==NULL)
 		{
-		DIE_FAILURE("config.bed_filename undefined.\n");
+		DIE_FAILURE("config->bed_filename undefined.\n");
 		}
-	if(config.ped_filename==NULL)
+	if(config->ped_filename==NULL)
 		{
-		DIE_FAILURE("config.ped_filename undefined.\n");
+		DIE_FAILURE("config->ped_filename undefined.\n");
 		}
-	if(config.ibd_filename==NULL)
+	if(config->ibd_filename==NULL)
 		{
-		DIE_FAILURE("config.ibd_filename undefined.\n");
+		DIE_FAILURE("config->ibd_filename undefined.\n");
 		}
-	DEBUG("Opening HDF5 file %s",config.hdf5_filename );
-	config.file_id = H5Fcreate(config.hdf5_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	if( config.file_id < 0)
+	DEBUG("Opening HDF5 file %s",config->hdf5_filename );
+	config->file_id = H5Fcreate(config->hdf5_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	if( config->file_id < 0)
 		{
-		DIE_FAILURE("H5Fcreate failed err=%d.\n", config.file_id);
+		DIE_FAILURE("H5Fcreate failed err=%d.\n", config->file_id);
 		}
-	readPed(&config);
-	readFaidx(&config);
-	readBed(&config);
-	readIbd(&config);
+	readPed(config);
+	readFaidx(config);
+	readBed(config);
+	readIbd(config);
 	DEBUG("Closing HDF5 file");
-	assertGE0(H5Fclose(config.file_id)); 
+	assertGE0(H5Fclose(config->file_id)); 
 	return EXIT_SUCCESS;
 	}
 
-static int main_query(int argc,char** argv)
+
+void ContextOpenForRead(ContextPtr config)
 	{
-	
-	int status;
-	Context config;
-	memset((void*)&config,0,sizeof(Context));
-	config.argc=argc;
-	config.argv=argv;
+	DEBUG("Opening HDF5 file %s",config->hdf5_filename );
+	config->file_id = H5Fopen(config->hdf5_filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+	if( config->file_id < 0)
+		{
+		DIE_FAILURE("H5Fopen failed err=%d.\n", config->file_id);
+		}
+	if( config->on_read_load_dict )
+		{
+		DEBUG("Loading dictionary " DATASET_DICTIONARY);
+
+		// http://stackoverflow.com/questions/15786626/get-the-dimensions-of-a-hdf5-dataset
+		hid_t dataset_id =H5Dopen(config->file_id, DATASET_DICTIONARY, H5P_DEFAULT);
+		hid_t dspace = H5Dget_space(dataset_id);
+
+		assert(H5Sget_simple_extent_ndims(dspace)==1);
+
+		int atype  = H5Dget_type(dataset_id); 
+		hsize_t dims[1];
+		H5Sget_simple_extent_dims(dspace, dims, NULL);
+		//DEBUG("type = %d dims:%d N=%d\n",atype,ndims,dims[0]);
+		
+		config->chromosome_count=dims[0];
+		config->chromosomes = (ChromPtr)safeCalloc(config->chromosome_count,sizeof(Chrom));
+		
+		H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->chromosomes);
+		
+		H5Sclose(dspace);
+		H5Dclose(dataset_id);
+		DEBUG("end reading dict");
+		}
+
+	if( config->on_read_load_markers )
+		{
+		DEBUG("Loading " DATASET_MARKERS);
+
+		// http://stackoverflow.com/questions/15786626/get-the-dimensions-of-a-hdf5-dataset
+		hid_t dataset_id = VERIFY(H5Dopen(config->file_id, DATASET_MARKERS, H5P_DEFAULT));
+		hid_t dspace = VERIFY(H5Dget_space(dataset_id));
+
+		assert(H5Sget_simple_extent_ndims(dspace)==1);
+
+		int atype  = H5Dget_type(dataset_id); 
+		hsize_t dims[1];
+		H5Sget_simple_extent_dims(dspace, dims, NULL);
+		DEBUG("type = %d  N=%d\n",atype,dims[0]);
+		
+		config->marker_count=dims[0];
+
+		config->markers = (MarkerPtr)safeCalloc(config->marker_count,sizeof(MarkerPtr));
+
+		H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->markers);
+
+		H5Sclose(dspace);
+		H5Dclose(dataset_id);
+		DEBUG("end reading " DATASET_MARKERS);
+		}
+	}
+
+
+static int main_dict(int argc,char** argv)
+	{
+	size_t i;
+	ContextPtr config=ContextNew(argc,argv);
+	config->on_read_load_dict = 1;
 	
 	if(optind+1!=argc)
 		{
 		fprintf(stderr,"Illegal number of arguments.\n");
 		return EXIT_FAILURE;
 		}	
-	config.hdf5_filename=argv[optind];
-	DEBUG("Opening HDF5 file %s",config.hdf5_filename );
-	config.file_id = H5Fopen(config.hdf5_filename, H5F_ACC_RDONLY, H5P_DEFAULT);
-	if( config.file_id < 0)
+	config->hdf5_filename=argv[optind];
+	ContextOpenForRead(config);
+	
+	
+	for(i=0;i< config->chromosome_count;++i)
 		{
-		DIE_FAILURE("H5Fcreate failed err=%d.\n", config.file_id);
+		fputs( config->chromosomes[i].name , config->out);
+		fputc('\t', config->out);
+		fprintf(config->out,"%d", config->chromosomes[i].length );
+		fputc('\n', config->out);
 		}
 	
-	DEBUG("Reading " DATASET_DICTIONARY);
-	// http://stackoverflow.com/questions/15786626/get-the-dimensions-of-a-hdf5-dataset
-	int dataset_id =H5Dopen(config.file_id, DATASET_DICTIONARY, H5P_DEFAULT);
-	hid_t dspace = H5Dget_space(dataset_id);
 
-	int ndims = (int)H5Sget_simple_extent_ndims(dspace);
-	int atype  = H5Dget_type(dataset_id); 
-	hsize_t dims[1];
-	H5Sget_simple_extent_dims(dspace, dims, NULL);
-	DEBUG("type = %d dims:%d N=%d\n",atype,ndims,dims[0]);
-	
-	config.chromosome_count=dims[0];
-	config.chromosomes = (ChromPtr)safeCalloc(config.chromosome_count,sizeof(Chrom));
-	
-	H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config.chromosomes);
-	size_t i;
-for(i=0;i< config.chromosome_count;++i)
-	{
-	DEBUG("%s", config.chromosomes[i].name);
-	}
-      
-
-
-	DEBUG("Closing HDF5 ok");
-
-	H5Sclose(dspace);
-	H5Dclose(dataset_id);
+	fflush(config->out);
 	DEBUG("Closing HDF5 file");
-	assertGE0(H5Fclose(config.file_id)); 
+	VERIFY(H5Fclose(config->file_id)); 
 	return EXIT_SUCCESS;
 	}
 
 
+void parseRegion(ContextPtr ctx,RegionPtr rgn,const char* s)
+	{
+	ChromPtr chrom=NULL;
+	char* colon=strchr(s,':'); 
+	memset((void*)rgn,0,sizeof(Region));
+	rgn->tid=-1;
+	if(colon==NULL)
+		{DEBUG("");
+		chrom=findExistingChromosomeByName(ctx,s);
+		rgn->tid = chrom->tid;
+		rgn->start = 0;
+		rgn->end = chrom->length;
+		}
+	else
+		{
+		char* tmp;
+		char* hyphen=strchr(colon,'-'); 
+		
+		if(hyphen==NULL) DIE_FAILURE("'-' missing in %s.",s);
+		tmp=safeStrNDup(s,colon-s);
+		chrom=findExistingChromosomeByName(ctx,tmp);
+		free(tmp);
+		rgn->tid = chrom->tid;
+		
+		tmp=safeStrNDup(colon+1,hyphen-(colon+1));
+		rgn->start = atoi(tmp);
+		free(tmp);
+
+		tmp=safeStrDup(hyphen+1);
+		rgn->end = atoi(tmp);
+		free(tmp);
+
+		if(rgn->start > rgn->end)
+			{
+			DIE_FAILURE("bad region: '%s'.",s);
+			}
+
+		}
+	}
+
+static int main_markers(int argc,char** argv)
+	{
+	size_t i;
+	ContextPtr config=ContextNew(argc,argv);
+	config->on_read_load_dict = 1;
+	config->on_read_load_markers = 1;
+	RegionPtr region=NULL;
+	char* rgn_str=NULL;
+	for(;;)
+		{
+		struct option long_options[] =
+		     {
+		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
+			{"region",    required_argument, 0, 'r'},
+		       {0, 0, 0, 0}
+		     };
+		 /* getopt_long stores the option index here. */
+		int option_index = 0;
+	     	int c = getopt_long (argc, argv, "r:",
+		                    long_options, &option_index);
+		if(c==-1) break;
+		switch(c)
+			{
+			case 'r': rgn_str = optarg ;break;
+			
+			case 0: break;
+			case '?': break;
+			default: exit(EXIT_FAILURE); break;
+			}
+		}	
+	if(optind+1!=argc)
+		{
+		fprintf(stderr,"Illegal number of arguments.\n");
+		return EXIT_FAILURE;
+		}	
+	config->hdf5_filename=argv[optind];
+	ContextOpenForRead(config);
+	
+	if(rgn_str!=NULL)
+		{
+		region=(RegionPtr)safeCalloc(1,sizeof(Region));
+		parseRegion(config,region,rgn_str);
+		DEBUG("region: tid=%d:%d-%d",region->tid,region->start,region->end);
+		};
+	
+
+	for(i=0;i< config->marker_count;++i)
+		{
+		MarkerPtr marker = &config->markers[i];
+		
+		if( region!=NULL)
+			{
+			if( region->tid != marker->tid ) continue;
+			if( marker->position < region->start) continue;
+			if( marker->position > region->end) continue;
+			}
+		
+		fputs( config->chromosomes[ marker->tid ].name , config->out);
+		fputc('\t', config->out);
+		fprintf(config->out,"%d", marker->position);
+		fputc('\t', config->out);
+		fprintf(config->out,"%d", marker->position+1);
+		fputc('\t', config->out);
+		fputs( marker->name , config->out);
+		if( fputc('\n', config->out) < 0) break;
+		}
+	
+	fflush(config->out);
+	DEBUG("Closing HDF5 file");
+	VERIFY(H5Fclose(config->file_id)); 
+	if(region!=NULL)
+		{
+		free(region);
+		}
+	
+	return EXIT_SUCCESS;
+	}
+
+
+
 int main(int argc,char** argv)
 	{
+	int status=EXIT_FAILURE;
 	if(argc>1)
 		{
 		if(strcmp("build",argv[1])==0)
 			{
-			return main_build(argc-1,&argv[1]);
+			status=main_build(argc-1,&argv[1]);
 			}
-		if(strcmp("query",argv[1])==0)
+		else if(strcmp("dict",argv[1])==0)
 			{
-			return main_query(argc-1,&argv[1]);
+			status=main_dict(argc-1,&argv[1]);
+			}
+		else if(strcmp("markers",argv[1])==0)
+			{
+			status= main_markers(argc-1,&argv[1]);
+			}
+		else
+			{
+			fprintf(stderr,"Unknown sub program %s.\n",argv[1]);
 			}
 		}
 	else
 		{
-		DIE_FAILURE("Unknown sub program .");
-		return EXIT_FAILURE;
+		fprintf(stderr,"sub program missing.\n");
 		}
+	
+	DEBUG("%s: exiting with status=%d",argv[0],status);
+	return status;
 	}
