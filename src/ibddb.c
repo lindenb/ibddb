@@ -33,6 +33,7 @@ THE SOFTWARE.
 #define DATASET_IBD "/ibd"
 #define DATASET_MARKERS "/markers"
 #define DATASET_PEDIGREE "/pedigree"
+#define DEFAULT_TRESHOLD_LIMIT 0.1f
 
 static int MarkerCompareByChromName(const void* a,const void *b)
 	{
@@ -236,7 +237,7 @@ static void readIbd(ContextPtr ctx)
 
 	
 	{
-	hid_t plist;  /* property list */
+
 	hsize_t  dims_memory[3]={1,1,3};
 	hsize_t  dims[3] = {ctx->marker_count,ctx->pair_count,3};
 	hid_t  memspace  = H5Screate_simple(3, dims_memory, NULL); 
@@ -332,13 +333,12 @@ static void readIbd(ContextPtr ctx)
 				ibd_values[i]=(float)strtod(tokens[6+i],&p2);
 				if((*p2!=0))
 					{
-					DIE_FAILURE("bad ibd value column $%d in %s after '%s'. ",
+					DIE_FAILURE("bad ibd value column $%zu "PRIuPTR" in %s after '%s'. ",
 						(6+i+1),tokens[6+i],p2);
 					}
 				if(ibd_values[i]<0.0f || ibd_values[i]>1.0f)
 					{
-					DEBUG("%f %f ",atof("0.9663"),strtof("0.9663",NULL));
-					DIE_FAILURE("Column $%d : bad ibd value =%f in \"%s\".",
+					DIE_FAILURE("Column $%zu : bad ibd value =%f in \"%s\".",
 						(6+i+1),ibd_values[i],tokens[6+i]);
 					}
 				}
@@ -686,8 +686,6 @@ static ContextPtr ContextNew(int argc,char** argv)
 
 static int main_build(int argc,char** argv)
 	{
-	
-	int status;
 	ContextPtr config = ContextNew(argc,argv);
 
 	
@@ -767,6 +765,7 @@ static int main_build(int argc,char** argv)
 		VERIFY(H5Dclose(dataset_id)); \
 		DEBUG("End reading " DATASETNAME)
 
+			
 void ContextOpenForRead(ContextPtr config)
 	{
 	DEBUG("Opening HDF5 file %s",config->hdf5_filename );
@@ -1088,12 +1087,283 @@ static int main_pairs(int argc,char** argv)
 
 	for(i=0;i< config->pair_count;++i)
 		{
-		int j;
 		PairIndiPtr pair = &config->pairs[i];
 		printIndividual(&config->individuals[pair->indi1idx],config->out);
 		fputc('\t', config->out);
 		printIndividual(&config->individuals[pair->indi2idx],config->out);
 		if( fputc('\n', config->out) < 0) break;
+		}
+
+	ContextFree(config);
+	return EXIT_SUCCESS;
+	}
+
+static int main_ibd(int argc,char** argv)
+	{
+	float ibd_values[3];
+	float treshold=DEFAULT_TRESHOLD_LIMIT;
+	int print_header=TRUE;
+	int print_pairs=TRUE;
+	size_t i,j;
+	ContextPtr config=ContextNew(argc,argv);
+	RegionPtr region=NULL;
+	char* rgn_str=NULL;
+	config->on_read_load_pedigree = 1;
+	config->on_read_load_pairs = 1;
+	config->on_read_load_dict = 1;
+	config->on_read_load_markers = 1;
+
+	/** Graphics2D stuff */
+	long genome_size=0L;
+	Dimension imageDimension;	
+	imageDimension.width=1000;
+	imageDimension.height=300;
+	ExpData* expData=NULL;
+	size_t expData_count=0L;
+	double max_y=0.0;
+	char* image_filename;
+	
+
+
+	for(;;)
+		{
+		struct option long_options[] =
+		     {
+		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
+		       {"region",    required_argument, 0, 'r'},
+		       {"noheader",  no_argument, &print_header, 0},
+		       {"image",  required_argument, 0, 'g'},
+		       {0, 0, 0, 0}
+		     };
+		 /* getopt_long stores the option index here. */
+		int option_index = 0;
+	     	int c = getopt_long (argc, argv, "r:g:",
+		                    long_options, &option_index);
+		if(c==-1) break;
+		switch(c)
+			{
+			case 'r': rgn_str = optarg ;break;
+			case 'g': image_filename = optarg ;break;
+			case 0: break;
+			case '?': break;
+			default: exit(EXIT_FAILURE); break;
+			}
+		}	
+	if(optind+1!=argc)
+		{
+		fprintf(stderr,"Illegal number of arguments.\n");
+		return EXIT_FAILURE;
+		}
+	
+	config->hdf5_filename=argv[optind];
+	ContextOpenForRead(config);
+	
+	if(rgn_str!=NULL)
+		{
+		region=(RegionPtr)safeCalloc(1,sizeof(Region));
+		parseRegion(config,region,rgn_str);
+		genome_size=1+(region->end -  region->start);
+		}
+	else
+		{
+		for(i=0;i< config->chromosome_count;++i)
+			{
+			config->chromosomes[i].cumulative_start+=genome_size;
+			genome_size+= config->chromosomes[i].length;
+			}
+		}
+
+
+	DEBUG("Loading " DATASET_IBD); 
+	hid_t dataset_id = VERIFY(H5Dopen(config->file_id,DATASET_IBD, H5P_DEFAULT)); 
+	hid_t dataspace_id = VERIFY(H5Dget_space(dataset_id)); 
+	hsize_t  dims_memory[3]={1,1,3};
+	hid_t  memspace  = H5Screate_simple(3, dims_memory, NULL);
+	
+	
+	
+
+
+	if(print_header && image_filename==NULL)
+		{
+		fputs("CHROM\tPOS\tNAME",config->out);
+		for(i=0;i< config->pair_count && print_pairs;++i)
+			{
+			PairIndiPtr pair = &config->pairs[i];
+			//if(!pair->selected) continue;
+			IndividualPtr indi1=&config->individuals[pair->indi1idx];
+			IndividualPtr indi2=&config->individuals[pair->indi2idx];		
+			fprintf(config->out,"\t%s:%s|%s:%s",
+				indi1->family,indi1->name,
+				indi2->family,indi2->name
+				);
+
+			}
+		fputs("\tCOUNT_IBD",config->out);
+		fputc('\n',config->out);
+		}
+
+	for(i=0;i< config->marker_count;++i)
+		{
+		MarkerPtr marker = &config->markers[i];
+		int count_pairs=0;
+		if( region!=NULL)
+			{
+			if( region->tid != marker->tid ) continue;
+			if( marker->position < region->start) continue;
+			if( marker->position > region->end) continue;
+			}
+		
+		if(image_filename==NULL)
+			{
+			fputs( config->chromosomes[ marker->tid ].name , config->out);
+			fputc('\t', config->out);
+			fprintf(config->out,"%d", marker->position);
+			fputc('\t', config->out);
+			fputs( marker->name , config->out);
+			}
+		for(j=0;j< config->pair_count ;++j)
+			{
+			PairIndiPtr pair = &config->pairs[j];
+			//if(!pair->selected) continue;
+			
+			
+
+			hsize_t read_start[3] = {marker->index,pair->index,0};
+			hsize_t read_count[3] = {1,1,3};
+			
+			
+			VERIFY(H5Sselect_hyperslab(
+				dataspace_id,
+				H5S_SELECT_SET,
+				read_start, NULL, 
+				read_count, NULL
+				));
+			
+			VERIFY(H5Dread(
+				dataset_id,
+				H5T_NATIVE_FLOAT,
+				memspace,
+				dataspace_id,
+				H5P_DEFAULT,
+				ibd_values
+				));
+
+			if(print_pairs && image_filename==NULL)
+				{
+				fputc('\t', config->out);
+				fprintf(config->out,"%f",ibd_values[0]);
+				}
+			if( ibd_values[0] < treshold)
+				{
+				count_pairs++;
+				} 
+			}
+		if(image_filename==NULL)
+			{
+			fprintf(config->out,"\t%d",count_pairs);
+			if( fputc('\n', config->out) < 0) break;
+			}
+		else
+			{
+			if(count_pairs>0)
+				{
+				expData=(ExpDataPtr)safeRealloc(expData,(expData_count+1)*sizeof(ExpData));
+				expData[expData_count].marker_index = marker->index;
+				expData[expData_count].value = count_pairs;
+				expData_count++;
+				if( count_pairs > max_y) max_y=count_pairs;
+				}
+			}
+		}
+	
+	if(image_filename!=NULL)
+		{
+		Rectangle drawingArea;
+ 		cairo_surface_t *surface=NULL;
+  		cairo_t *cr=NULL;
+		surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, imageDimension.width, imageDimension.height);
+		if(surface==NULL) DIE_FAILURE("Cannot create image");
+  		cr = cairo_create(surface);
+		if(cr==NULL) DIE_FAILURE("Cannot create image context");
+
+		drawingArea.x=	100;
+		drawingArea.width= imageDimension.width-200;
+		drawingArea.y=	50;
+		drawingArea.height= imageDimension.height-100;		
+		
+		cairo_set_font_size(cr, 13);
+
+#define BASE2PIXEL(chrom,POS)  (drawingArea.x+((region==NULL?POS:config->chromosomes[chrom].cumulative_start+POS)/(double)genome_size)*drawingArea.width)
+
+		if(region!=NULL)
+			{
+			cairo_set_line_width (cr, 0.1);
+			for(i=0;i< config->chromosome_count;++i)
+				{
+				if(i%2==0)
+					{
+					cairo_set_source_rgb (cr, 0, 0, 0);
+					}
+				else
+					{
+					cairo_set_source_rgb (cr, 0, 0, 0);
+					}
+				cairo_rectangle(cr,
+					BASE2PIXEL(i,0),
+					drawingArea.y,
+					BASE2PIXEL(i,config->chromosomes[i].length)-BASE2PIXEL(i,0),
+					drawingArea.height
+					);
+				cairo_fill(cr);
+
+				cairo_move_to (cr, (BASE2PIXEL(i,0)+BASE2PIXEL(i,config->chromosomes[i].length))/2.0, 12);
+				cairo_set_source_rgb (cr, 0.5, 0.5, 0.5);
+				cairo_show_text (cr, config->chromosomes[i].name);
+				}
+			}
+		else
+			{
+			cairo_move_to (cr, drawingArea.x+drawingArea.width/2.0, 12);
+			cairo_set_source_rgb (cr, 1, 1, 0.5);
+			cairo_show_text (cr, rgn_str);
+			}
+
+		for(i=0;i< expData_count;++i)
+			{
+			MarkerPtr marker=&config->markers[expData[i].marker_index];
+			double cx = BASE2PIXEL(marker->tid,marker->position);
+			double cy = drawingArea.y + drawingArea.height - (expData[i].value/max_y)*drawingArea.height ;
+			
+			cairo_move_to (cr, cx-5, cy);
+			cairo_line_to (cr, cx+5, cy);
+			cairo_move_to (cr, cx, cy-5);
+			cairo_line_to (cr, cx, cy+5);
+			cairo_stroke (cr);
+			}
+
+		//frame
+		cairo_set_line_width (cr, 0.1);
+		cairo_set_source_rgb (cr,0, 0, 0);
+		cairo_rectangle (cr, drawingArea.x, drawingArea.y,drawingArea.width,drawingArea.height);
+		cairo_stroke (cr);
+		
+		DEBUG("saving image as %s",image_filename);
+		cairo_surface_write_to_png(surface, image_filename);
+  		cairo_destroy(cr);
+  		cairo_surface_destroy(surface);
+		
+		free(expData);
+		}
+
+
+	VERIFY(H5Sclose(memspace));
+	VERIFY(H5Sclose(dataspace_id)); 
+	VERIFY(H5Dclose(dataset_id)); 
+
+	if(region!=NULL)
+		{
+		free(region);
 		}
 
 	ContextFree(config);
@@ -1125,6 +1395,10 @@ int main(int argc,char** argv)
 		else if(strcmp("pairs",argv[1])==0)
 			{
 			status= main_pairs(argc-1,&argv[1]);
+			}
+		else if(strcmp("ibd",argv[1])==0)
+			{
+			status= main_ibd(argc-1,&argv[1]);
 			}
 		else
 			{

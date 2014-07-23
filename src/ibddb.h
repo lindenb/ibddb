@@ -26,6 +26,7 @@ THE SOFTWARE.
 #define IBDDB_H
 
 #include <hdf5.h>
+#include <cairo.h>
 #include "utils.h"
 
 
@@ -38,6 +39,8 @@ typedef struct chrom_t
 	char* name;
 	int tid;
 	int length;
+
+	TRANSIENT(long) cumulative_start;
 	} Chrom,*ChromPtr;
 
 
@@ -114,7 +117,40 @@ typedef struct context_t
 	} Context,*ContextPtr;
 
 
+/** graphics Stuff */
+typedef struct rectangle2d_t
+	{
+	double x;
+	double y;
+	double width;
+	double height;
+	} Rectangle2D,*Rectangle2DPtr;
+
+typedef struct rectangle_t
+	{
+	int x;
+	int y;
+	int width;
+	int height;
+	} Rectangle,*RectanglePtr;
+
+typedef struct dimension_t
+	{
+	int width;
+	int height;
+	} Dimension,*DimensionPtr;
+
+typedef struct dimension2d_t
+	{
+	double width;
+	double height;
+	} Dimension2D,*Dimension2DPtr;
 
 
+typedef struct expdata_t
+	{
+	size_t marker_index;
+	double value;
+	} ExpData,*ExpDataPtr;
 
 #endif

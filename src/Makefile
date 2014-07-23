@@ -1,8 +1,8 @@
 .PHONY : all clean test
 HDF5HOME=/commun/data/packages/hdf5
 CC=${HDF5HOME}/bin/h5cc
-CFLAGS= -noshlib -prefix=${HDF5HOME} -g -Wall
-LIBS=-lz 
+CFLAGS= -noshlib -prefix=${HDF5HOME} -g -Wall `pkg-config --cflags cairo`
+LIBS=-lz `pkg-config  --libs cairo`
 
 all: ibddb
 
