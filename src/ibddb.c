@@ -801,7 +801,7 @@ void ContextOpenForRead(ContextPtr config)
 		
 		config->marker_count=dims[0];
 
-		config->markers = (MarkerPtr)safeCalloc(config->marker_count,sizeof(MarkerPtr));
+		config->markers = (MarkerPtr)safeCalloc(config->marker_count,sizeof(Marker));
 
 		H5Dread(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT, config->markers);
 
@@ -809,6 +809,39 @@ void ContextOpenForRead(ContextPtr config)
 		H5Dclose(dataset_id);
 		DEBUG("end reading " DATASET_MARKERS);
 		}
+	}
+
+static void ContextFree(ContextPtr config)
+	{
+	size_t i;
+
+	if(config==NULL) return ;
+	if(config->out!=NULL)
+		{
+		fflush(config->out);
+		}
+	
+	for(i=0;i< config->marker_count;++i)
+		{
+		free( config->markers[i].name);
+		}
+
+	free(config->markers);
+	
+	
+	for(i=0;i< config->chromosome_count;++i)
+		{
+		free( config->chromosomes[i].name);
+		}
+
+	free(config->chromosomes);
+
+	
+	if(config->file_id!=0)
+		{
+		VERIFY(H5Fclose(config->file_id)); 
+		}
+	free(config);
 	}
 
 
@@ -836,9 +869,7 @@ static int main_dict(int argc,char** argv)
 		}
 	
 
-	fflush(config->out);
-	DEBUG("Closing HDF5 file");
-	VERIFY(H5Fclose(config->file_id)); 
+	ContextFree(config);
 	return EXIT_SUCCESS;
 	}
 
@@ -949,15 +980,11 @@ static int main_markers(int argc,char** argv)
 		fputs( marker->name , config->out);
 		if( fputc('\n', config->out) < 0) break;
 		}
-	
-	fflush(config->out);
-	DEBUG("Closing HDF5 file");
-	VERIFY(H5Fclose(config->file_id)); 
 	if(region!=NULL)
 		{
 		free(region);
 		}
-	
+	ContextFree(config);
 	return EXIT_SUCCESS;
 	}
 

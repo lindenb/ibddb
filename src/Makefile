@@ -1,16 +1,16 @@
 .PHONY : all clean test
-CC=gcc
-CFLAGS= -g -Wall -I/commun/data/packages/hdf5/include
-LDFLAGS= -L/commun/data/packages/hdf5/lib
-LIBS=-lz -lhdf5
+HDF5HOME=/commun/data/packages/hdf5
+CC=${HDF5HOME}/bin/h5cc
+CFLAGS= -noshlib -prefix=${HDF5HOME} -g -Wall
+LIBS=-lz 
 
 all: ibddb
 
 ibddb: utils.o ibddb.o
-	$(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)	
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LIBS)	
 
 ibddb.o : ibddb.c ibddb.h  utils.h
-	$(CC) -c -o $@ $(CFLAGS) $<
+	$(CC) $(CFLAGS) -c -o $@  $<
 
 utils.o : utils.c utils.h
 	$(CC) -c -o $@ $(CFLAGS) $<
