@@ -60,6 +60,22 @@ size_t strsplit(char* src,char delim,char** offsets,size_t max_tokens)
 	return found;
 	}
 
+
+int strStartsWith(const char* s,const char* prefix)
+	{
+	size_t lenstr = strlen(s),lenprefix = strlen(prefix);
+    	return lenstr < lenprefix ? 0 : strncmp(prefix, s, lenprefix) == 0;
+	}
+
+int strEndsWith(const char* str,const char* suffix)
+	{
+   	size_t lenstr = strlen(str);
+    	size_t lensuffix = strlen(suffix);
+    	if (lensuffix >  lenstr) return 0;
+    	return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+	}
+
+
 char* gzReadLine(gzFile in,size_t *str_size)
 	{
 	int c;

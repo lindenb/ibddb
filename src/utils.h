@@ -41,6 +41,8 @@ char* gzReadLine(gzFile in,size_t *str_size);
 size_t strsplit(char* src,char delim,char** offsets,size_t max_tokens);
 char* safeStrDup(const char* src);
 char* safeStrNDup(const char* src,size_t n);
+int strEndsWith(const char* s,const char* suff);
+int strStartsWith(const char* s,const char* suff);
 
 /** stdlib */
 void* _safeMalloc(const char*,int,size_t);
