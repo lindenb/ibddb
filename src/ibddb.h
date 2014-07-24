@@ -24,7 +24,7 @@ THE SOFTWARE.
 */
 #ifndef IBDDB_H
 #define IBDDB_H
-
+#include <time.h>
 #include <hdf5.h>
 #include <cairo.h>
 #include "utils.h"
@@ -90,8 +90,10 @@ typedef struct context_t
 	char* bed_filename;
 	char* ped_filename;
 	char* ibd_filename;
-	hid_t       file_id;   /* file identifier */
+	hid_t       file_id;   /* HDF5 file identifier */
 
+	/** start time */
+	time_t startup;
 
 	/** chromosomes */
 	ChromPtr chromosomes;

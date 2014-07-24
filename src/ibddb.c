@@ -183,6 +183,11 @@ static void readIbd(ContextPtr ctx)
 			PairIndi key;
 			PairIndiPtr found;
 			char* tokens[9];
+			if(line[0]==0 || line[0]=='#')
+				{
+				free(line);
+				continue;
+				}
 			if(strsplit(line,'\t',tokens,9)<9)
 				{
 				DIE_FAILURE("BOUM IBD in %s",line1);
@@ -233,7 +238,8 @@ static void readIbd(ContextPtr ctx)
 			}
 
 		gzclose(in);
-		free(line1);		
+		free(line1);
+		DEBUG("Step 1: Closing IBD %s",line1);		
 		}
 	gzclose(in1);
 	for( i=0;i< ctx->pair_count;++i)
@@ -295,8 +301,10 @@ static void readIbd(ContextPtr ctx)
 	in1=safeGZOpen(ctx->ibd_filename,"r");
 	while((line1=gzReadLine(in1,&line_len))!=NULL)
 		{
+		size_t nLines=0UL;
 		ChromPtr prev_chrom=NULL;
 		char *line;
+		time_t start_time = time(NULL);
 		DEBUG("Step 2 : Opening IBD %s",line1);
 		in=safeGZOpen(line1,"r");			
 		
@@ -308,9 +316,16 @@ static void readIbd(ContextPtr ctx)
 			float ibd_values[3]={0.0f,0.0f,0.0f};
 			PairIndiPtr found;
 			char* tokens[9];
+			++nLines;
+			if(line[0]==0 || line[0]=='#')
+				{
+				free(line);
+				continue;
+				}
+
 			if(strsplit(line,'\t',tokens,10)<9)
 				{
-				DIE_FAILURE("BOUM IBD in %s",line1);
+				DIE_FAILURE("BOUM IBD in %s line %d",line1,nLines);
 				}
 			p1= findIndividualByFamName(ctx,tokens[0],tokens[1]);
 			p2= findIndividualByFamName(ctx,tokens[2],tokens[3]);
@@ -410,6 +425,14 @@ static void readIbd(ContextPtr ctx)
 			}
 
 		gzclose(in);
+
+		double seconds= difftime(time(NULL),start_time);
+		DEBUG("Step 2 : Closing IBD \"%s\". N=%d That took %.E seconds. speed=%E  lines/seconds.",
+			line1,
+			nLines,
+			seconds,
+			nLines/seconds
+			);
 		free(line1);		
 		}
 	gzclose(in1);
@@ -720,6 +743,7 @@ static ContextPtr ContextNew(int argc,char** argv)
 	config->argc = argc;
 	config->argv = argv;
 	config->out = stdout;
+	config->startup = time(NULL);
 	return config;
 	}
 
@@ -855,8 +879,13 @@ void ContextOpenForRead(ContextPtr config)
 static void ContextFree(ContextPtr config)
 	{
 	size_t i;
-
+	double seconds;
+	time_t now=time(NULL);	
 	if(config==NULL) return ;
+
+	seconds = difftime(now,config->startup);
+	DEBUG("DURATION: %.f seconds.", seconds);
+
 	if(config->out!=NULL)
 		{
 		fflush(config->out);
@@ -1257,8 +1286,8 @@ static int main_ibd(int argc,char** argv)
 		{
 		for(i=0;i< config->chromosome_count;++i)
 			{
-			config->chromosomes[i].cumulative_start+=genome_size;
-			genome_size+= config->chromosomes[i].length;
+			config->chromosomes[i].cumulative_start = genome_size;
+			genome_size += config->chromosomes[i].length;
 			}
 		}
 	//enable all pairs
@@ -1533,7 +1562,7 @@ static int main_ibd(int argc,char** argv)
 
 
 
-#define BASE2PIXEL(chrom,POS)  (drawingArea.x+((region==NULL?POS:config->chromosomes[chrom].cumulative_start+POS)/(double)genome_size)*drawingArea.width)
+#define BASE2PIXEL(chrom,POS)  (drawingArea.x+((region!=NULL?POS:config->chromosomes[chrom].cumulative_start+POS)/(double)genome_size)*drawingArea.width)
 
 		if(region==NULL)
 			{

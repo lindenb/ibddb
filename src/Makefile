@@ -5,9 +5,10 @@ CFLAGS= -noshlib -prefix=${HDF5HOME} -g -Wall `pkg-config --cflags cairo`
 LIBS=-lz -lm `pkg-config  --libs cairo`
 
 
-all: ibddb
+all: ../bin/ibddb
 
-ibddb: utils.o ibddb.o hershey.o
+../bin/ibddb: utils.o ibddb.o hershey.o
+	mkdir -p $(dir $@) && \
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LIBS)	
 
 ibddb.o : ibddb.c ibddb.h  utils.h hershey.h githash.h
@@ -28,4 +29,4 @@ githash.h:
 
 
 clean:
-	rm -f *.o ibddb githash.h
+	rm -f *.o ../bin/ibddb githash.h
