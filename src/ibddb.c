@@ -38,7 +38,13 @@ THE SOFTWARE.
 #define DATASET_PEDIGREE "/pedigree"
 #define DEFAULT_TRESHOLD_LIMIT 0.1f
 static const float IBD_UNDEFINED=-9999.99f;
+#define USAGE_PREAMBLE fprintf(stderr,"\n\n%s\nAuthor: Pierre Lindenbaum PhD\nGit-Hash: "GIT_HASH"\nWWW: https://github.com/lindenb/ibddb\nCompilation: %s at %s\n\n",argv[0],__DATE__,__TIME__)
 
+/**
+ * callback to compare two markers on tid,name
+ * used in readIBD to retrieve a marker with bsearch
+ *
+ */
 static int MarkerCompareByChromName(const void* a,const void *b)
 	{
 	const MarkerPtr i=(const MarkerPtr)a;
@@ -48,7 +54,11 @@ static int MarkerCompareByChromName(const void* a,const void *b)
 	return strcmp(i->name, j->name);
 	}
 
-
+/**
+ * callback to compare two markers on tid,position
+ * used to build an ordered list of markers
+ *
+ */
 static int MarkerCompareByLoc(const void* a,const void *b)
 	{
 	const MarkerPtr i=(const MarkerPtr)a;
@@ -58,6 +68,11 @@ static int MarkerCompareByLoc(const void* a,const void *b)
 	return i->position - j->position;
 	}
 
+/**
+ * callback to compare two individual on family,name
+ * used to build an ordered pedigree
+ *
+ */
 static int IndividualCompareByFamName(const void* a,const void *b)
 	{
 	const IndividualPtr i=(const IndividualPtr)a;
@@ -67,9 +82,15 @@ static int IndividualCompareByFamName(const void* a,const void *b)
 	return strcmp(i->name,  j->name);
 	}
 
+/**
+ * Simple & stupid 'find chrom by name'.
+ * Could be faster with a bsearch
+ *
+ */
 static ChromPtr findChromosomeByName(ContextPtr ctx,const char* cname)
 	{
 	size_t i=0;
+	assert(cname!=NULL);
 	for(i=0;i< ctx->chromosome_count;++i)
 		{
 		if( strcmp(ctx->chromosomes[i].name,cname)==0)
@@ -80,6 +101,10 @@ static ChromPtr findChromosomeByName(ContextPtr ctx,const char* cname)
 	return NULL;
 	}
 
+/**
+ * Same as findChromosomeByName but raises an error if
+ *  the chromosome doesn't exist in dictionary
+ */
 static ChromPtr findExistingChromosomeByName(ContextPtr ctx,const char* cname)
 	{
 	ChromPtr c=findChromosomeByName(ctx,cname);
@@ -90,6 +115,10 @@ static ChromPtr findExistingChromosomeByName(ContextPtr ctx,const char* cname)
 	return c;
 	}
 
+/**
+ * find an individual(fam,indi) in the pedigree using a besearch.
+ * raises an error if the individual was not found. 
+ */
 
 static IndividualPtr findIndividualByFamName(ContextPtr ctx,const char* fam,const char* indi)
 	{
@@ -694,9 +723,25 @@ static ContextPtr ContextNew(int argc,char** argv)
 	return config;
 	}
 
+static void build_usage(int argc,char** argv)
+	{
+	USAGE_PREAMBLE;
+	fputs("\nOptions:\n",stderr);
+	fputs(" -o|--out      ouput filename. An HDF5 file. Required.\n",stderr);
+	fputs(" -D|--dict     sequence dictionary. Required.\n",stderr);
+	fputs(" -b|--bed      bed file of markers. Required.\n",stderr);
+	fputs(" -p|--ped      pedigree file. Required.\n",stderr);
+	fputs(" -i|--ibd      file containing path to IBD files. Required.\n",stderr);
+	fputs("\n\n",stderr);
+	}
 
 static int main_build(int argc,char** argv)
 	{
+	if(argc<=1)
+		{
+		build_usage(argc,argv);
+		return EXIT_FAILURE;
+		}
 	ContextPtr config = ContextNew(argc,argv);
 
 	
@@ -704,7 +749,6 @@ static int main_build(int argc,char** argv)
 		{
 		struct option long_options[] =
 		     {
-		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
 			{"out",    required_argument, 0, 'o'},
  			{"dict",    required_argument, 0, 'D'},
 			{"bed",    required_argument, 0, 'b'},
@@ -732,6 +776,10 @@ static int main_build(int argc,char** argv)
 	if(config->hdf5_filename==NULL)
 		{
 		DIE_FAILURE("config->hdf5_filename undefined.\n");
+		}
+	if(!strEndsWith(config->hdf5_filename,".h5"))
+		{
+		DIE_FAILURE("ouput filename should end with '.h5'.\n");
 		}
 	if(config->bed_filename==NULL)
 		{
@@ -1627,7 +1675,7 @@ static int main_ibd(int argc,char** argv)
 	ContextFree(config);
 	return EXIT_SUCCESS;
 	}
-#define USAGE_PREAMBLE fprintf(stderr,"\n\n%s\nAuthor: Pierre Lindenbaum PhD\nCompilation:%s at %s\n\n",argv[0],__DATE__,__TIME__)
+
 
 static void main_usage(int argc,char** argv)
 	{

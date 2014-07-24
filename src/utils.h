@@ -30,6 +30,7 @@ THE SOFTWARE.
 #include <errno.h>
 #include <string.h>
 #include <zlib.h>
+#include "githash.h"
 
 typedef signed char boolean_t;
 
@@ -55,7 +56,7 @@ void* _safeRealloc(const char*,int,void*,size_t);
 
 
 #define WHERENL fprintf(stderr,"[%s:%d] ",__FILE__,__LINE__)
-#define DIE_FAILURE(FormatLiteral,...) do { WHERENL; fprintf (stderr,"Exiting: " FormatLiteral "\n", ##__VA_ARGS__); exit(EXIT_FAILURE);} while(0)
+#define DIE_FAILURE(FormatLiteral,...) do { WHERENL; fprintf (stderr,"Git-Hash:"GIT_HASH". Exiting: " FormatLiteral "\n", ##__VA_ARGS__); exit(EXIT_FAILURE);} while(0)
 #define DEBUG(FormatLiteral, ...)  do { fputs("[DEBUG]",stderr); WHERENL; fprintf (stderr,"" FormatLiteral "\n", ##__VA_ARGS__);} while(0)
 
 #ifndef MIN 

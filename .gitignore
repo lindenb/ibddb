@@ -1,3 +1,5 @@
 *~
 *.o
 jeter*
+src/githash.h
+*.h5

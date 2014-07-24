@@ -28,7 +28,7 @@ THE SOFTWARE.
 #include <hdf5.h>
 #include <cairo.h>
 #include "utils.h"
-
+#include "githash.h"
 
 
 /** just a flag to map the type as transient (not saved in HDF5 file )*/
