@@ -22,6 +22,20 @@ Storing & Querying IBD status in a **HDF5** database.
 ```bash
 $ make
 ```
+## error "while loading shared libraries"
+
+If  you get this error message:
+
+```
+ibddb: error while loading shared libraries: libhdf5.so.8: cannot open shared object file: No such file or directory
+```
+
+you'll have to define the LD_LIBRARY_PATH
+
+```
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/path/to/distribution-of/hdf5/lib
+```
+
 
 ## `build` Building the database
 

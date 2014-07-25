@@ -118,6 +118,17 @@ typedef struct context_t
 	boolean_t on_read_load_pairs;
 	} Context,*ContextPtr;
 
+/** placeholder to open/close the '/IBD' dataset, used by standalone and R extension */
+typedef struct ibd_dataset_t
+	{
+	hid_t dataset_id;
+	hid_t dataspace_id;
+	hid_t  memspace;
+	} IbdDataSet,*IbdDataSetPtr;
+/** open the IBD dataset for reading */
+IbdDataSetPtr IbdDataSetOpen(ContextPtr config);
+/** close the IBD dataset after reading */
+void IbdDataSetClose(IbdDataSetPtr ds);
 
 /** graphics Stuff */
 typedef struct rectangle2d_t
@@ -154,5 +165,8 @@ typedef struct expdata_t
 	size_t marker_index;
 	double value;
 	} ExpData,*ExpDataPtr;
+
+
+#define USAGE_PREAMBLE fprintf(stderr,"\n\n%s\nAuthor: Pierre Lindenbaum PhD\nGit-Hash: "GIT_HASH"\nWWW: https://github.com/lindenb/ibddb\nCompilation: %s at %s\n\n",argv[0],__DATE__,__TIME__)
 
 #endif

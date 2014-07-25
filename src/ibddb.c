@@ -38,7 +38,7 @@ THE SOFTWARE.
 #define DATASET_PEDIGREE "/pedigree"
 #define DEFAULT_TRESHOLD_LIMIT 0.1f
 static const float IBD_UNDEFINED=-9999.99f;
-#define USAGE_PREAMBLE fprintf(stderr,"\n\n%s\nAuthor: Pierre Lindenbaum PhD\nGit-Hash: "GIT_HASH"\nWWW: https://github.com/lindenb/ibddb\nCompilation: %s at %s\n\n",argv[0],__DATE__,__TIME__)
+
 
 /**
  * callback to compare two markers on tid,name
@@ -759,7 +759,7 @@ static void build_usage(int argc,char** argv)
 	fputs("\n\n",stderr);
 	}
 
-static int main_build(int argc,char** argv)
+int main_build(int argc,char** argv)
 	{
 	if(argc<=1)
 		{
@@ -915,7 +915,7 @@ static void ContextFree(ContextPtr config)
 	}
 
 
-static int main_dict(int argc,char** argv)
+int main_dict(int argc,char** argv)
 	{
 	size_t i;
 	ContextPtr config=ContextNew(argc,argv);
@@ -984,7 +984,7 @@ void parseRegion(ContextPtr ctx,RegionPtr rgn,const char* s)
 		}
 	}
 
-static int main_markers(int argc,char** argv)
+int main_markers(int argc,char** argv)
 	{
 	size_t i;
 	ContextPtr config=ContextNew(argc,argv);
@@ -1089,7 +1089,7 @@ static void printIndividual(const IndividualPtr individual,FILE* out)
 	}
 
 
-static int main_pedigree(int argc,char** argv)
+int main_pedigree(int argc,char** argv)
 	{
 	size_t i;
 	ContextPtr config=ContextNew(argc,argv);
@@ -1099,8 +1099,6 @@ static int main_pedigree(int argc,char** argv)
 		{
 		struct option long_options[] =
 		     {
-		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
-
 		       {0, 0, 0, 0}
 		     };
 		 /* getopt_long stores the option index here. */
@@ -1137,7 +1135,7 @@ static int main_pedigree(int argc,char** argv)
 	return EXIT_SUCCESS;
 	}
 
-static int main_pairs(int argc,char** argv)
+int main_pairs(int argc,char** argv)
 	{
 	size_t i;
 	ContextPtr config=ContextNew(argc,argv);
@@ -1186,6 +1184,26 @@ static int main_pairs(int argc,char** argv)
 	return EXIT_SUCCESS;
 	}
 
+
+IbdDataSetPtr IbdDataSetOpen(ContextPtr config)
+	{
+	hsize_t  dims_memory[3]={1,1,3};
+	IbdDataSetPtr ds=(IbdDataSetPtr)safeCalloc(1,sizeof(IbdDataSet));
+	DEBUG("Loading " DATASET_IBD); 
+	ds->dataset_id = VERIFY(H5Dopen(config->file_id,DATASET_IBD, H5P_DEFAULT)); 
+	ds->dataspace_id = VERIFY(H5Dget_space(ds->dataset_id)); 	
+	ds->memspace  = H5Screate_simple(3, dims_memory, NULL);
+	return ds;
+	}
+
+void IbdDataSetClose(IbdDataSetPtr ds)
+	{
+	if(ds==NULL) return;
+	VERIFY(H5Sclose(ds->memspace));
+	VERIFY(H5Sclose(ds->dataspace_id)); 
+	VERIFY(H5Dclose(ds->dataset_id)); 
+	}
+
 struct ArrayOfStrings
 	{
 	char** data;
@@ -1218,7 +1236,7 @@ static void ibd_usage(int argc,char** argv)
 	fputs("\n\n",stderr);
 	}
 
-static int main_ibd(int argc,char** argv)
+int main_ibd(int argc,char** argv)
 	{
 	float ibd_values[3];
 	float treshold=DEFAULT_TRESHOLD_LIMIT;
@@ -1415,11 +1433,9 @@ static int main_ibd(int argc,char** argv)
 			}
 		}
 
-	DEBUG("Loading " DATASET_IBD); 
-	hid_t dataset_id = VERIFY(H5Dopen(config->file_id,DATASET_IBD, H5P_DEFAULT)); 
-	hid_t dataspace_id = VERIFY(H5Dget_space(dataset_id)); 
-	hsize_t  dims_memory[3]={1,1,3};
-	hid_t  memspace  = H5Screate_simple(3, dims_memory, NULL);
+	
+	IbdDataSetPtr ibdds= IbdDataSetOpen(config);
+	
 	
 	
 	
@@ -1474,17 +1490,17 @@ static int main_ibd(int argc,char** argv)
 			
 			
 			VERIFY(H5Sselect_hyperslab(
-				dataspace_id,
+				ibdds->dataspace_id,
 				H5S_SELECT_SET,
 				read_start, NULL, 
 				read_count, NULL
 				));
 			
 			VERIFY(H5Dread(
-				dataset_id,
+				ibdds->dataset_id,
 				H5T_NATIVE_FLOAT,
-				memspace,
-				dataspace_id,
+				ibdds->memspace,
+				ibdds->dataspace_id,
 				H5P_DEFAULT,
 				ibd_values
 				));
@@ -1722,12 +1738,9 @@ static int main_ibd(int argc,char** argv)
 		HersheyFree(hershey);
 		free(expData);
 		}//end of image
-
-
-	VERIFY(H5Sclose(memspace));
-	VERIFY(H5Sclose(dataspace_id)); 
-	VERIFY(H5Dclose(dataset_id)); 
-
+	
+	IbdDataSetClose(ibdds);
+	
 	if(region!=NULL)
 		{
 		free(region);
@@ -1737,61 +1750,3 @@ static int main_ibd(int argc,char** argv)
 	return EXIT_SUCCESS;
 	}
 
-
-static void main_usage(int argc,char** argv)
-	{
-	USAGE_PREAMBLE;
-	fprintf(stderr,"Usage:\n\t%s [subprogram] (options)\n\n",argv[0]);
-	fputs("Sub-Programs:\n\n",stderr);
-	fputs(" build   : build IBD database.\n",stderr);
-	fputs(" ibd     : query ibds.\n",stderr);
-	fputs(" dict    : dump reference dictionary.\n",stderr);
-	fputs(" ped     : dump pedigree.\n",stderr);
-	fputs(" markers : dump markers.\n",stderr);
-	fputs(" pairs   : dump pairs of individuals.\n",stderr);
-	fputs("\n\n",stderr);
-	}
-
-int main(int argc,char** argv)
-	{
-	int status=EXIT_FAILURE;
-	if(argc>1)
-		{
-		if(strcmp("build",argv[1])==0)
-			{
-			status=main_build(argc-1,&argv[1]);
-			}
-		else if(strcmp("dict",argv[1])==0)
-			{
-			status=main_dict(argc-1,&argv[1]);
-			}
-		else if(strcmp("markers",argv[1])==0)
-			{
-			status= main_markers(argc-1,&argv[1]);
-			}
-		else if(strcmp("ped",argv[1])==0)
-			{
-			status= main_pedigree(argc-1,&argv[1]);
-			}
-		else if(strcmp("pairs",argv[1])==0)
-			{
-			status= main_pairs(argc-1,&argv[1]);
-			}
-		else if(strcmp("ibd",argv[1])==0)
-			{
-			status= main_ibd(argc-1,&argv[1]);
-			}
-		else
-			{
-			fprintf(stderr,"Unknown sub program %s.\n",argv[1]);
-			}
-		}
-	else
-		{
-		main_usage(argc,argv);
-		return EXIT_SUCCESS;
-		}
-	
-	DEBUG("%s: exiting with status=%d",argv[0],status);
-	return status;
-	}

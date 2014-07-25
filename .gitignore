@@ -3,3 +3,5 @@
 jeter*
 src/githash.h
 *.h5
+bin
+lib
