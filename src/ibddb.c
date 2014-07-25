@@ -325,7 +325,7 @@ static void readIbd(ContextPtr ctx)
 
 			if(strsplit(line,'\t',tokens,10)<9)
 				{
-				DIE_FAILURE("BOUM IBD in %s line %d",line1,nLines);
+				DIE_FAILURE("BOUM IBD in %s line %"PRIuPTR,line1,nLines);
 				}
 			p1= findIndividualByFamName(ctx,tokens[0],tokens[1]);
 			p2= findIndividualByFamName(ctx,tokens[2],tokens[3]);
@@ -388,7 +388,7 @@ static void readIbd(ContextPtr ctx)
 				ibd_values[i]=(float)strtod(tokens[6+i],&p2);
 				if((*p2!=0))
 					{
-					DIE_FAILURE("bad ibd value column $%zu "PRIuPTR" in %s after '%s'. ",
+					DIE_FAILURE("bad ibd value column $%"PRIuPTR" in %s after '%s'. ",
 						(6+i+1),tokens[6+i],p2);
 					}
 				if(ibd_values[i]<0.0f || ibd_values[i]>1.0f)
@@ -427,7 +427,7 @@ static void readIbd(ContextPtr ctx)
 		gzclose(in);
 
 		double seconds= difftime(time(NULL),start_time);
-		DEBUG("Step 2 : Closing IBD \"%s\". N=%d That took %.E seconds. speed=%E  lines/seconds.",
+		DEBUG("Step 2 : Closing IBD \"%s\". N=%"PRIuPTR" That took %.E seconds. speed=%E  lines/seconds.",
 			line1,
 			nLines,
 			seconds,
@@ -1197,7 +1197,27 @@ struct ArrayOfStrings
 	a.data[a.size]=s;\
 	a.size++	
 
-	
+static void ibd_usage(int argc,char** argv)
+	{
+	USAGE_PREAMBLE;
+	fprintf(stderr,"Usage:\n\t%s (options) file.h5\n\n",argv[0]);
+	fputs("Options:\n\n",stderr);
+	fputs(" -r|--region (chr|chr:start-end) restrict to that region. Optional.\n",stderr);
+	fputs(" -i|--individual (fam:name) restrict to that individual. Can be used multiple times.\n",stderr);
+	fputs(" -p|--pair (fam1:name1|fam2:name2) restrict to that pair. Can be used multiple times.\n",stderr);
+	fputs(" -F|--family (fam) restrict to that family. Can be used multiple times.\n",stderr);
+	fputs(" --noselfself ignore all self-self pairs.\n",stderr);
+	fprintf(stderr," --treshold (float) IBD TRESHOLD default:%f \n", DEFAULT_TRESHOLD_LIMIT);
+	fputs("\nTabular Options:\n\n",stderr);
+	fputs(" -noheader don't print data header.\n",stderr);
+	fputs(" -nopairsinheader don't print pairs in data header.\n",stderr);
+	fputs("\nImage Options:\n\n",stderr);
+	fputs(" -g|--image (filename.png) save as PNG picture.\n",stderr);
+	fputs(" --width (int) image-width.\n",stderr);
+	fputs(" --height (int) image-height.\n",stderr);
+	fputs("\n\n",stderr);
+	}
+
 static int main_ibd(int argc,char** argv)
 	{
 	float ibd_values[3];
@@ -1233,7 +1253,11 @@ static int main_ibd(int argc,char** argv)
 	double max_y=0.0;
 	char* image_filename=NULL;
 	
-	
+	if(argc==1)
+		{
+		ibd_usage(argc,argv);
+		return EXIT_FAILURE;
+		}
 
 
 	for(;;)
@@ -1243,11 +1267,16 @@ static int main_ibd(int argc,char** argv)
 		      // {"enable-self-self",  no_argument , &config->enable_self_self , 1},
 			{"region",    required_argument, 0, 'r'},
 			{"noheader",  no_argument, &print_header, 0},
+			{"nopairsinheader",  no_argument, &print_pairs, 0},
 			{"image",  required_argument, 0, 'g'},
 			{"individual",  required_argument, 0, 'i'},
 			{"pair",  required_argument, 0, 'p'},
 			{"family",  required_argument, 0, 'F'},
 			{"noselfself", no_argument, &allow_self_self, 0},
+			{"width",  required_argument, 0,1024},
+			{"height",  required_argument, 0,1025},
+			{"treshold",  required_argument, 0,1026},
+		
 			{0, 0, 0, 0}
 		     };
 		 /* getopt_long stores the option index here. */
@@ -1262,6 +1291,9 @@ static int main_ibd(int argc,char** argv)
 			case 'i': PUSH_STR_TO_ARRAY(limitIndividuals,optarg);break;
 			case 'p': PUSH_STR_TO_ARRAY(limitPairs,optarg);break;
 			case 'F': PUSH_STR_TO_ARRAY(limitFamilies,optarg);break;
+			case 1024: imageDimension.width = atoi(optarg);break;
+			case 1025: imageDimension.height = atoi(optarg);break;
+			case 1026: treshold = atof(optarg);break;
 			case 0: break;
 			case '?': break;
 			default: exit(EXIT_FAILURE); break;
@@ -1337,10 +1369,10 @@ static int main_ibd(int argc,char** argv)
 					if(strcmp(qName,limitIndividuals.data[j])==0) break;
 					}
 				free(qName);
-				if(j==limitIndividuals.size) break;//individual[side] not found in limitIndividuals
+				if(j!=limitIndividuals.size) break;//individual[side] found in limitIndividuals
 					
 				}
-			if(side!=2)
+			if(side==2)
 				{
 				pair->selected=FALSE;
 				continue;
