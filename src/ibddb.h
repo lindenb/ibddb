@@ -118,6 +118,13 @@ typedef struct context_t
 	boolean_t on_read_load_pairs;
 	} Context,*ContextPtr;
 
+/* create a new context from argc/argv */
+ContextPtr ContextNew(int,char** );
+/* dispose context */
+void ContextFree(ContextPtr);
+/** open IBD context for reading after config->hdf5_filename and config->on_load_* be assigned */
+void ContextOpenForRead(ContextPtr config);
+
 /** placeholder to open/close the '/IBD' dataset, used by standalone and R extension */
 typedef struct ibd_dataset_t
 	{
@@ -125,6 +132,8 @@ typedef struct ibd_dataset_t
 	hid_t dataspace_id;
 	hid_t  memspace;
 	} IbdDataSet,*IbdDataSetPtr;
+	
+	
 /** open the IBD dataset for reading */
 IbdDataSetPtr IbdDataSetOpen(ContextPtr config);
 /** close the IBD dataset after reading */

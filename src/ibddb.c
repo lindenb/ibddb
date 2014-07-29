@@ -737,7 +737,7 @@ static void readFaidx(ContextPtr ctx)
 	//assertGE0(H5Dclose(faidx_dataset_id));*/
 	}
 
-static ContextPtr ContextNew(int argc,char** argv)
+ContextPtr ContextNew(int argc,char** argv)
 	{
 	ContextPtr config=(ContextPtr)safeCalloc(1,sizeof(Context));
 	config->argc = argc;
@@ -848,7 +848,11 @@ int main_build(int argc,char** argv)
 		VERIFY(H5Dclose(dataset_id)); \
 		DEBUG("End reading " DATASETNAME)
 
-			
+/**
+ *
+ * open IBD context for reading after config->hdf5_filename and config->on_load_* be assigned
+ *
+ */		
 void ContextOpenForRead(ContextPtr config)
 	{
 	DEBUG("Opening HDF5 file %s",config->hdf5_filename );
@@ -876,7 +880,7 @@ void ContextOpenForRead(ContextPtr config)
 		}
 	}
 
-static void ContextFree(ContextPtr config)
+void ContextFree(ContextPtr config)
 	{
 	size_t i;
 	double seconds;

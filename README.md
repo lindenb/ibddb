@@ -375,7 +375,54 @@ $ ibddb dict test.h5
 10	135534747
 (...)
 ```
+# R Interface
 
+Doc: TODO
+
+## Example
+
+the following R program print the IBD0 for y=Marker, x=pairs.
+
+```R
+source("ibddb.R")
+
+# OPEN IBD Database
+ibd <- ibd.open("../test/test.h5");
+
+###  loop over markers
+for(y in seq(0,min(50,ibd.num.markers(ibd)-1)) )
+	{
+	## get y-th marker
+	marker <- ibd.marker(ibd,y)
+	## get chromosome info for this marker
+	chrom <- ibd.chromosome(ibd,marker$tid)
+	
+	### loop over pairs
+	for(x in seq(0,min(10,ibd.num.pairs(ibd)-1)) )
+		{
+		## get x-th pair
+		pair <- ibd.pair(ibd,x)
+		## get first individual of this pair
+		indi1 <- ibd.individual(ibd,pair$indi1idx)
+		## get second individual of this pair
+		indi2 <- ibd.individual(ibd,pair$indi2idx)
+		
+		cat(paste(chrom$name,marker$name,marker$position,
+			paste(indi1$family,indi1$name,sep=":"),
+			paste(indi2$family,indi2$name,sep=":"),
+			sep="\t"))
+		cat("\t")
+		# print IBD 0
+		cat(ibd.ibd0(ibd,y,x))
+		cat("\n")
+		}
+	}
+
+
+
+# releases resources associated to IBD database
+ibd.close(ibd);
+```
 
 # Author
 

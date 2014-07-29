@@ -1,20 +1,21 @@
 .PHONY : all clean test
+export LD_LIBRARY_PATH
 HDF5HOME=/commun/data/packages/hdf5
 CC=gcc
 CFLAGS= -fPIC -I${HDF5HOME}/include -g -Wall `pkg-config --cflags cairo` -I/commun/data/packages/R-2.15-3/lib64/R/include
 LIBS=-L${HDF5HOME}/lib -L../lib -lz -lm `pkg-config  --libs cairo` -lhdf5
+#-I${HDF5HOME}/include `pkg-config --cflags cairo`  
 
+all:../bin/ibddb ../lib/libibddb.so
+	R --vanilla  < test.R
 
-all: ../lib/libibddb.so ../bin/ibddb
-
-
-../bin/ibddb: ibddb_main.o utils.o ibddb.o hershey.o
+../bin/ibddb : ibddb_main.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LIBS)	
-../lib/libibddb.so: ibddbR.o utils.o ibddb.o hershey.o
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LIBS)
+
+../lib/libibddb.so : ibddbR.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
-	$(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^
-	$(CC) -fPIC -shared -Wl,-soname,ibddb.so -o ../lib/ibddb.so $^
+	$(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^ ${LIBS}
 
 ibddbR.o :  ibddbR.c ibddb.h utils.h
 	$(CC) $(CFLAGS) -c -o $@  $<
