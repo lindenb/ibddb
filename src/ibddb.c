@@ -910,6 +910,18 @@ void ContextFree(ContextPtr config)
 
 	free(config->chromosomes);
 
+	free(config->pairs);
+	
+	for(i=0;i< config->individual_count;++i)
+		{
+		free( config->individuals[i].family);
+		free( config->individuals[i].name);
+		free( config->individuals[i].father);
+		free( config->individuals[i].mother);
+		}
+
+	free(config->individuals);
+
 	
 	if(config->file_id!=0)
 		{
