@@ -133,7 +133,7 @@ static IndividualPtr findIndividualByFamName(ContextPtr ctx,const char* fam,cons
               	sizeof(Individual),
 		IndividualCompareByFamName
 		);
-	if(found==NULL) DIE_FAILURE("undefined individual %s:%s",fam,indi);
+	if(found==NULL) DIE_FAILURE("undefined individual \"%s:%s\"",fam,indi);
 	return found;
 	}
 
@@ -152,6 +152,8 @@ static int PairIndiCompare(const void* a,const void *b)
  */
 static void readIbd(ContextPtr ctx)
 	{
+	
+
 	char* line1;
 	size_t i,line_len=0UL;
 	gzFile in1,in;
@@ -172,10 +174,32 @@ static void readIbd(ContextPtr ctx)
 	in1=safeGZOpen(ctx->ibd_filename,"r");
 	while((line1=gzReadLine(in1,&line_len))!=NULL)
 		{
+		size_t n_ibd_markers=0;
+		size_t nLines=1;
 		char *line;
 		DEBUG("Step 1: Opening IBD %s",line1);
 		in=safeGZOpen(line1,"r");			
 		
+		//Read first line
+		line = gzReadLine(in,&line_len);
+		if(line==NULL)
+			{
+			DIE_FAILURE("Cannot read first line of %s",ctx->ibd_filename);
+			}
+		else //get number of markers
+			{
+			unsigned int count_columns=0;
+			
+			line = ltrim(line,&line_len);
+			count_columns =  strchcount(line,'\t') +1 ;
+			if(count_columns<5)
+				{
+				DIE_FAILURE("Expected at least 5 columns in %s",line);
+				}
+			n_ibd_markers = count_columns-4;
+			free(line);
+			}
+		//get the line, get the pairs
 		while((line=gzReadLine(in,&line_len))!=NULL)
 			{
 			IndividualPtr p1;
@@ -183,12 +207,24 @@ static void readIbd(ContextPtr ctx)
 			PairIndi key;
 			PairIndiPtr found;
 			char* tokens[9];
-			if(line[0]==0 || line[0]=='#')
+			++nLines;
+			line = ltrim(line,&line_len);
+			if( nLines % 1000 == 0 )
 				{
-				free(line);
-				continue;
+				DEBUG("N=%"PRIuPTR" %s",nLines,line1);
 				}
-			if(strsplit(line,'\t',tokens,9)<9)
+			
+			if( strchcount(line,'\t')+1 != (n_ibd_markers*3)+4 ) /* fam1/indi1/fam2/indi2 =4*/
+				{
+				DIE_FAILURE("BOUM IBD got %"PRIuPTR" columns expected %"PRIuPTR" n.markers=%"PRIuPTR" in %50.50s...",
+					strchcount(line,'\t')+1,
+					(n_ibd_markers*3)+4,
+					n_ibd_markers,
+					line
+					);
+				}
+			
+			if(strsplit(line,'\t',tokens,5)<5)
 				{
 				DIE_FAILURE("BOUM IBD in %s",line1);
 				}
@@ -238,14 +274,19 @@ static void readIbd(ContextPtr ctx)
 			}
 
 		gzclose(in);
-		free(line1);
 		DEBUG("Step 1: Closing IBD %s",line1);		
+		free(line1);
 		}
 	gzclose(in1);
+	
+	
+	/* update the pairs */
 	for( i=0;i< ctx->pair_count;++i)
 		{
 		ctx->pairs[i].index=(int)i;
 		}
+	
+	/* insert pairs in HDF5 */
 	{
 	 hsize_t  dims[1] = {ctx->pair_count};
 
@@ -277,7 +318,7 @@ static void readIbd(ContextPtr ctx)
 	H5Tclose(pairtype);
 	}	
 
-	
+	/** insert the data */
 	{
 	hid_t plistid;
 	hsize_t  dims_memory[3]={1,1,3};
@@ -301,29 +342,119 @@ static void readIbd(ContextPtr ctx)
 	in1=safeGZOpen(ctx->ibd_filename,"r");
 	while((line1=gzReadLine(in1,&line_len))!=NULL)
 		{
-		size_t nLines=0UL;
-		ChromPtr prev_chrom=NULL;
+		ChromPtr chrom=NULL;
+		MarkerPtr* ibd_markers_id=NULL;
 		char *line;
 		time_t start_time = time(NULL);
 		DEBUG("Step 2 : Opening IBD %s",line1);
 		in=safeGZOpen(line1,"r");			
+		size_t nLines=1UL;
+		size_t n_ibd_markers=0UL;
+		double expect_n_lines=0;
+		line = gzReadLine(in,&line_len);
+		if( line == NULL)
+			{
+			DIE_FAILURE("NOT FIRST LINE ?? in %s",line1);
+			}
+		else
+			{
+			size_t count_columns=0,column_index=0;
+			line = ltrim(line,&line_len);
+			count_columns =  strchcount(line,'\t') +1 ;
+			n_ibd_markers =  (count_columns-4);
+			
+			//scan marker id, build a list of MarkerPtr
+			ibd_markers_id = (MarkerPtr*)safeMalloc(sizeof(MarkerPtr)*(n_ibd_markers));
+			column_index=0;/* yes 0 */
+			for(i=0; i < line_len;++i)
+				{
+				size_t j=i;
+				
+				//find next space
+				while(j<line_len && !(line[j]=='\t' || line[j]==0))
+					{
+					++j;
+					}
+				line[j]=0;//set end of string
+				
+				/* 3 IBD status */
+				if(column_index==0)
+					{
+					if(strcmp(&line[i],"3")!=0)
+						{
+						DIE_FAILURE("In first line, 1st column . Expected 3 got %s",&line[i]);
+						}
+					}
+				else if(column_index==1)
+					{
+					expect_n_lines = atof(&line[i]);
+					}
+				/* get the chromosome and its' index */
+				else if(column_index==2)
+					{
+					chrom = findChromosomeByName(ctx,&line[i]);
+					if(chrom==NULL)
+						{
+						DIE_FAILURE("unknown chromosome %s",&line[i]);
+						}
+					}
+				else if(column_index==3)
+					{
+					if(atoi(&line[i])!=(int)n_ibd_markers)
+						{
+						DIE_FAILURE("inconsistent number of markers %s",&line[i]);
+						}
+					}
+				else /* find markers */		
+					{
+					Marker key2;
+					key2.tid = chrom->tid;
+					key2.name = (char*)&line[i];
+					/* get the marker */
+					MarkerPtr marker= (MarkerPtr)bsearch(
+						(const void*)&key2,
+						markersbyname,
+						ctx->marker_count,
+				              	sizeof(Marker),
+						MarkerCompareByChromName
+						);
+					if(marker==NULL) DIE_FAILURE("unknown marker  %s",&line[i]);
+					ibd_markers_id[column_index-4] = marker;
+					}
+				column_index++;
+				i=j;
+				}
+			}
+		
+		
 		
 		while((line=gzReadLine(in,&line_len))!=NULL)
 			{
+			size_t j;
 			IndividualPtr p1;
 			IndividualPtr p2;
 			PairIndi key;
+			size_t expect_n_columns= n_ibd_markers*3 + 4;
 			float ibd_values[3]={0.0f,0.0f,0.0f};
-			PairIndiPtr found;
-			char* tokens[9];
+			PairIndiPtr found=NULL;
+			char** tokens=NULL;
 			++nLines;
+			if( nLines % 100 == 0 )
+				{
+				DEBUG("N=%"PRIuPTR" %2.2f%% %s",
+					nLines,
+					((nLines/(expect_n_lines-1.0))*100.0),
+					line1
+					);
+				}
 			if(line[0]==0 || line[0]=='#')
 				{
 				free(line);
 				continue;
 				}
-
-			if(strsplit(line,'\t',tokens,10)<9)
+			tokens=(char**)safeMalloc(sizeof(char*)*(expect_n_columns));
+			line = ltrim(line,&line_len);
+			if(strsplit(line,'\t',tokens,expect_n_columns)<expect_n_columns)
 				{
 				DIE_FAILURE("BOUM IBD in %s line %"PRIuPTR,line1,nLines);
 				}
@@ -356,74 +487,56 @@ static void readIbd(ContextPtr ctx)
 					); 
 				}
 				
-
-			
-			/* get the chromosome and its' index */
-			if(prev_chrom==NULL || strcmp(prev_chrom->name,tokens[4])!=0)
+			/* loop over each marker */
+			for(j=0;j< n_ibd_markers;++j)
 				{
-				prev_chrom=findChromosomeByName(ctx,tokens[4]);
-				if(prev_chrom==NULL)
+				MarkerPtr marker = ibd_markers_id[j];
+				for(i=0;i< 3;++i)
 					{
-					DIE_FAILURE("unknown chromosome %s",tokens[4]);
+					char* p2;
+					ibd_values[i]=(float)strtod(tokens[4 + (j*3) + i ],&p2);
+					if((*p2!=0))
+						{
+						DIE_FAILURE("bad ibd value column $%"PRIuPTR" in %50.50s after '%50.50s...'. ",
+							(4 + (j*3) + i ),
+							tokens[4 + (j*3) + i ],
+							p2);
+						}
+					if(ibd_values[i]<0.0f || ibd_values[i]>1.0f)
+						{
+						DIE_FAILURE("Column $%zu : bad ibd value =%f in \"%50.50s...\".",
+							(4 + (j*3) + i ),ibd_values[i],
+							tokens[4 + (j*3) + i ]);
+						}
 					}
-				}		
+				
+				hsize_t write_start[3] = {marker->index,found->index,0};
+				hsize_t write_count[3] = {1,1,3};
+				
+				assert(write_start[0] < ctx->marker_count);
+				assert(write_start[1] < ctx->pair_count);
 
-			Marker key2;
-			key2.tid=prev_chrom->tid;
-			key2.name=(char*)tokens[5];
-			/* get the marker */
-			MarkerPtr marker= (MarkerPtr)bsearch(
-				(const void*)&key2,
-				markersbyname,
-				ctx->marker_count,
-		              	sizeof(Marker),
-				MarkerCompareByChromName
-				);
-			if(marker==NULL) DIE_FAILURE("unknown marker %s %s",tokens[4],tokens[5]);
-
-			
-			for(i=0;i< 3;++i)
-				{
-				char* p2;
-				ibd_values[i]=(float)strtod(tokens[6+i],&p2);
-				if((*p2!=0))
-					{
-					DIE_FAILURE("bad ibd value column $%"PRIuPTR" in %s after '%s'. ",
-						(6+i+1),tokens[6+i],p2);
-					}
-				if(ibd_values[i]<0.0f || ibd_values[i]>1.0f)
-					{
-					DIE_FAILURE("Column $%zu : bad ibd value =%f in \"%s\".",
-						(6+i+1),ibd_values[i],tokens[6+i]);
-					}
+				
+				VERIFY(H5Sselect_hyperslab(
+					dataspace_id,
+					H5S_SELECT_SET,
+					write_start, NULL, 
+					write_count, NULL
+					));
+				
+				VERIFY(H5Dwrite(
+					dataset_id,
+					H5T_NATIVE_FLOAT,
+					memspace,
+					dataspace_id,
+					H5P_DEFAULT,
+					ibd_values
+					));
 				}
-			
-			hsize_t write_start[3] = {marker->index,found->index,0};
-			hsize_t write_count[3] = {1,1,3};
-			
-			assert(write_start[0] < ctx->marker_count);
-			assert(write_start[1] < ctx->pair_count);
-
-			
-			VERIFY(H5Sselect_hyperslab(
-				dataspace_id,
-				H5S_SELECT_SET,
-				write_start, NULL, 
-				write_count, NULL
-				));
-			
-			VERIFY(H5Dwrite(
-				dataset_id,
-				H5T_NATIVE_FLOAT,
-				memspace,
-				dataspace_id,
-				H5P_DEFAULT,
-				ibd_values
-				));
-		
+			free(tokens);
 			free(line);
 			}
-
+		
 		gzclose(in);
 
 		double seconds= difftime(time(NULL),start_time);
@@ -433,7 +546,8 @@ static void readIbd(ContextPtr ctx)
 			seconds,
 			nLines/seconds
 			);
-		free(line1);		
+		free(line1);
+		free(ibd_markers_id);	
 		}
 	gzclose(in1);
 	H5Pclose(plistid);
@@ -773,11 +887,12 @@ int main_build(int argc,char** argv)
 		{
 		struct option long_options[] =
 		     {
-			{"out",    required_argument, 0, 'o'},
- 			{"dict",    required_argument, 0, 'D'},
-			{"bed",    required_argument, 0, 'b'},
-			{"ped",    required_argument, 0, 'p'},
-			{"ibd",    required_argument, 0, 'i'},
+			{"out",         required_argument, 0, 'o'},
+ 			{"dict",    	required_argument, 0, 'D'},
+			{"bed",    	required_argument, 0, 'b'},
+			{"ped",    	required_argument, 0, 'p'},
+			{"pedigree",    required_argument, 0, 'p'},
+			{"ibd",         required_argument, 0, 'i'},
 		       {0, 0, 0, 0}
 		     };
 		 /* getopt_long stores the option index here. */

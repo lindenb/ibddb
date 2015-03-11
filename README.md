@@ -36,6 +36,11 @@ you'll have to define the LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/path/to/distribution-of/hdf5/lib
 ```
 
+for my collaborators at @institut_thorax (*.161)
+
+```
+export LD_LIBRARY_PATH=/commun/data/packages/hdf5/lib
+```
 
 ## `build` Building the database
 
@@ -88,19 +93,66 @@ analysis_IBD/BLP18.ibd.gz
 analysis_IBD/BLP19.ibd.gz
 ```
 
-An IBD file is a tab delimited file containing the following columns: Indi1-family,Indi1-name,  Indi2-family,Indi2-name,chromosome,marker-name,IBD0,IBD1,IBD2:
+An IBD file is a tab delimited file.
+
+The first row define the chromosome and the markers:
+
+* number of ibd status ? must be 3
+* number of pairs 
+* chromosomes
+* number of markers
+* marker 1
+* marker 2
+* marker 3
+* marker 4
+* ....
+
+e.g: 
 
 ```
-LDC	PA00333	LDC	L0336	17	rs31450789	0.0009	0.0050	0.9943	
-LDC	PA00333	LDC	L0336	17	rs8078919	0.0007	0.0044	0.9949	
-LDC	PA00333	LDC	L0336	17	rs7107537	0.0003	0.0009	0.9993	
-LDC	PA00333	LDC	L0336	17	rs9789059	0.0000	0.0007	0.9993	
-LDC	PA00333	LDC	L0336	17	rs31453179	0.0000	0.0006	0.9994	
-LDC	PA00333	LDC	L0336	17	rs8069970	0.0000	0.0003	0.9997	
-LDC	PA00333	LDC	L0336	17	rs31945173	0.0000	0.0001	0.9998	
-LDC	PA00333	LDC	L0336	17	rs6565714	0.0000	0.0003	0.9998	
-LDC	PA00333	LDC	L0336	17	rs33873157	0.0000	0.0003	0.9999	
-LDC	PA00333	LDC	L0336	17	rs9748036	0.0000	0.0003	0.9999	
+$ gunzip -c file.ibdtxt.gz  | head -n 1 | tr "\t" "\n" | head
+3
+2556
+21
+3506
+rs574999
+rs296537
+rs284579
+rs578623
+rs960546
+rs78045
+(...)
+```
+
+The remaining rows have the following columns:
+
+* Indi1-family
+* Indi1-name
+* Indi2-family
+* Indi2-name
+* marker1 IBD0 (float)
+* marker1 IBD1
+* marker1 IBD2
+* marker2 IBD0
+* marker2 IBD1
+* marker2 IBD2
+* marker3 IBD0
+* (...)
+
+e.g: 
+
+```
+$ gunzip -c ibdtxt.gz  | grep -v rs | head -n 1 | tr "\t" "\n" | head
+FAM1
+1
+FAM1
+1
+0
+0
+1
+0
+0
+1
 ```
 
 
@@ -524,7 +576,25 @@ for(y in seq(0,min(50,ibd.num.markers(ibd)-1)) )
 ibd.close(ibd);
 ```
 
+# Contribute
+
+- Issue Tracker: http://github.com/lindenb/ibddb/issues`
+- Source Code: http://github.com/lindenb/ibddb
+
+
+
+# History
+
+* 2015-03: new version of ibdld
+* 2014 1st version
+
 # Author
 
 Pierre Lindenbaum PhD
 @yokofakun
+
+
+## License
+
+The project is licensed under the MIT license.
+

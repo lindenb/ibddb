@@ -17,10 +17,10 @@ all:../bin/ibddb ../lib/libibddb.so
 	mkdir -p $(dir $@) && \
 	$(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^ ${LIBS}
 
-ibddbR.o :  ibddbR.c ibddb.h utils.h
+ibddbR.o :  ibddbR.c ibddb.h utils.h githash.h
 	$(CC) $(CFLAGS) -c -o $@  $<
 
-ibddb_main.o : ibddb_main.c ibddb.h  utils.h
+ibddb_main.o : ibddb_main.c ibddb.h  utils.h githash.h
 	$(CC) $(CFLAGS) -c -o $@  $<
 
 ibddb.o : ibddb.c ibddb.h  utils.h hershey.h githash.h
@@ -32,12 +32,33 @@ utils.o : utils.c utils.h githash.h
 hershey.o: hershey.c hershey.h
 	$(CC) $(CFLAGS) -c -o $@  $<	
 
+
+
 githash.h:
 	echo "#ifndef GIT_HASH" > $@
 	echo -n '#define GIT_HASH "' >> $@
 	-git rev-parse HEAD | tr -d "\n" >> $@
 	echo '"' >> $@
 	echo '#endif' >> $@
+
+ifeq ($(realpath ../test),)
+
+test: 
+
+else
+
+test: ../bin/ibddb $(realpath ../test/)
+	ls /commun/data/users/simonet/fsimonet/ANALYSES/BRUGADA/famille_belfast/analyse_IBD/belfast_prIBD_*.ibdtxt.gz | grep -E '(Chr22|Chr21)' > ../test/test.list
+	rm -f ../test/test.h5
+	../bin/ibddb build \
+		--out ../test/test.h5 \
+		--dict ../test/reference.dict \
+		--bed /commun/data/users/simonet/fsimonet/ANALYSES/BRUGADA/famille_belfast/analyse_IBD/belfast_prIBD.bed \
+		--pedigree /commun/data/users/simonet/fsimonet/ANALYSES/BRUGADA/famille_belfast/belfast_prIBD.fam \
+		--ibd  ../test/test.list
+
+endif
+
 
 
 clean:

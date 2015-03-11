@@ -25,6 +25,29 @@ THE SOFTWARE.
 
 #include "utils.h"
 
+/* left trim */
+char* ltrim(char* line,size_t* len)
+	{
+	if(line==NULL) return NULL;
+	while(*len >0 && isspace(line[*len-1]) )
+		{
+		--*len;
+		line[*len]=0;
+		}
+	return line;
+	}
+
+size_t strchcount(const char* src,char c)
+	{
+	size_t i=0,n=0;
+	while(src[i]!=0)
+		{
+		if(src[i]==c) n++;
+		++i;
+		}
+	return n;
+	}
+
 char* safeStrDup(const char* src)
 	{
 	char* p=strdup(src);
