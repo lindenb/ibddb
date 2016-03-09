@@ -81,6 +81,15 @@ typedef struct region_id
 	int end;
 	} Region,*RegionPtr;
 
+#define RESKIN_COLUMN_COUNT 9
+typedef struct reskin_id
+	{
+	int pair_id;
+	float data[RESKIN_COLUMN_COUNT];
+	TRANSIENT(boolean_t) selected;
+	} Reskin,*ReskinPtr;
+
+
 typedef struct context_t
 	{
 	int argc;
@@ -108,6 +117,9 @@ typedef struct context_t
 	/** pairs **/
 	PairIndiPtr pairs;
 	size_t pair_count;
+	/** reskins **/
+	ReskinPtr reskins;
+	size_t reskin_count;
 
 	/* default output file */
 	FILE* out;
@@ -117,6 +129,7 @@ typedef struct context_t
 	boolean_t on_read_load_markers;
 	boolean_t on_read_load_pedigree;
 	boolean_t on_read_load_pairs;
+	boolean_t on_read_load_reskins;
 	} Context,*ContextPtr;
 
 /* create a new context from argc/argv */

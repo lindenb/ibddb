@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2014 Pierre Lindenbaum PhD.
+Copyright (c) 2016 Pierre Lindenbaum PhD.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -36,6 +36,7 @@ THE SOFTWARE.
 #define DATASET_IBD "/ibd"
 #define DATASET_MARKERS "/markers"
 #define DATASET_PEDIGREE "/pedigree"
+#define DATASET_RESKIN "/reskin"
 #define DEFAULT_TRESHOLD_LIMIT 0.1f
 static const float IBD_UNDEFINED=-9999.99f;
 
@@ -816,7 +817,7 @@ static void readFaidx(ContextPtr ctx)
 	
 	hid_t chromtype = H5Tcreate (H5T_COMPOUND, sizeof (Chrom));
 	H5Tinsert(chromtype, "name", HOFFSET(Chrom, name), strtype);
-        H5Tinsert(chromtype, "tid", HOFFSET(Chrom, tid), H5T_NATIVE_INT);
+    H5Tinsert(chromtype, "tid", HOFFSET(Chrom, tid), H5T_NATIVE_INT);
  	H5Tinsert(chromtype, "length", HOFFSET(Chrom, length), H5T_NATIVE_INT);
 	
 
@@ -853,40 +854,131 @@ static void readFaidx(ContextPtr ctx)
 
 
 static void readReskin(ContextPtr ctx)
-	{
-	char* line;
-	size_t line_len=0UL,nLines=0UL;
-	gzFile in;
+	{	
 	if(ctx->reskin_filename==NULL)
 		{
 		fprintf(stderr,"[WARN] config->reskin_filename undefined.\n");
-		return;
 		}
-	in=safeGZOpen(ctx->reskin_filename,"r");
-	while((line=gzReadLine(in,&line_len))!=NULL)
+	else
 		{
-		IndividualPtr p1;
-		IndividualPtr p2;
-		PairIndi key;
-		char* tokens[12];
-		++nLines;
-		if(line[0]==0 || line[0]=='#')
-				{
-				free(line);
-				continue;
-				}
+		int i;
+		PairIndiPtr found = NULL;
+		ReskinPtr last = NULL;
+		gzFile in;
+		char* line;
+		size_t line_len=0UL,nLines=0UL;
+		in=safeGZOpen(ctx->reskin_filename,"r");
+		while((line=gzReadLine(in,&line_len))!=NULL)
+			{
+			IndividualPtr p1;
+			IndividualPtr p2;
+			PairIndi key;
+			char* tokens[12];
+			++nLines;
+			if(line[0]==0 || line[0]=='#')
+					{
+					free(line);
+					continue;
+					}
 		
-		if(strsplit(line,'\t',tokens,12)<12)
-				{
-				DIE_FAILURE("BOUM Reskin %s in %s line %"PRIuPTR,ctx->reskin_filename,line,nLines);
-				}
-		p1= findIndividualByFamName(ctx,tokens[0],tokens[1]);
-		p2= findIndividualByFamName(ctx,tokens[0],tokens[3]);
+			if(strsplit(line,'\t',tokens,12)<12)
+					{
+					DIE_FAILURE("BOUM Reskin %s in %s line %"PRIuPTR,ctx->reskin_filename,line,nLines);
+					}
+			p1= findIndividualByFamName(ctx,tokens[0],tokens[1]);
+			p2= findIndividualByFamName(ctx,tokens[0],tokens[2]);
 
 		
-		free(line);
+			if(p1->index < p2->index)
+					{
+					key.indi1idx=p1->index;
+					key.indi2idx=p2->index;
+					}
+				else
+					{
+					key.indi1idx=p2->index;
+					key.indi2idx=p1->index;
+					}
+
+			found=(PairIndiPtr)bsearch(
+				(const void*)&key,
+				ctx->pairs,
+				ctx->pair_count,
+			    sizeof(PairIndi),
+				PairIndiCompare
+				);
+			if(found==NULL) 
+				{
+				DIE_FAILURE("bsearch pair failed %s %s / %s %s",
+					tokens[0],tokens[1],
+					tokens[0],tokens[2]
+					); 
+				}
+			ctx->reskins = (ReskinPtr)safeRealloc( ctx->reskins, ctx->reskin_count+1);
+			last = &ctx->reskins[ ctx->reskin_count ];
+			ctx->reskin_count++;
+			
+			last->pair_id = found->index;
+			for(i=0;i< RESKIN_COLUMN_COUNT;++i)
+				{
+				char* p2;
+				last->data[i]=(float)strtod(tokens[3 +i],&p2);
+				if((*p2!=0))
+					{
+					DIE_FAILURE("bad reskin value column $%"PRIuPTR" in %50.50s after '%50.50s...'. ",
+						(3 +i),
+						tokens[3 +i],
+						p2);
+					}
+				if(last->data[i]<0.0f || last->data[i]>1.0f)
+					{
+					DIE_FAILURE("Column $%zu : bad ibd value =%f in \"%50.50s...\".",
+						(3+i),
+						last->data[i],
+						tokens[3 +i]
+						);
+					}
+				}
+
+			free(line);
+			}
+		gzclose(in);
 		}
-	gzclose(in);
+	
+	{
+	hsize_t  dims[1] = {ctx->reskin_count};
+	hsize_t  array_dim[1] = {RESKIN_COLUMN_COUNT};
+	hid_t array_dt = H5Tarray_create2(H5T_NATIVE_FLOAT, 1, array_dim);
+	
+	hid_t reskintype = H5Tcreate (H5T_COMPOUND, sizeof (Reskin));
+    H5Tinsert(reskintype, "pair_id", HOFFSET(Reskin, pair_id), H5T_NATIVE_INT);
+ 	H5Tinsert(reskintype, "data", HOFFSET(Reskin, data),array_dt);
+	
+
+
+	 /* Create the data space for the dataset. */
+	int dataspace_id =  H5Screate_simple (1,dims, NULL);
+	/* create dataset */
+	int dataset_id = H5Dcreate2(
+			ctx->file_id,
+			  DATASET_RESKIN,
+			  reskintype,
+			  dataspace_id, 
+              H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+	 H5Dwrite(
+			dataset_id,
+			reskintype,
+			H5S_ALL, H5S_ALL, H5P_DEFAULT,
+			ctx->reskins
+			);
+
+	H5Tclose(array_dt);
+	H5Dclose(dataset_id);
+	H5Sclose(dataspace_id);
+	H5Tclose(reskintype);
+	}
+
+	
 	}
 
 
@@ -993,7 +1085,7 @@ int main_build(int argc,char** argv)
 
 #define LOAD_CONFIG_DATASET(DATASETNAME,DATATYPE,ITEM_NAME,ITEM_COUNT) \
 		DEBUG("Loading " DATASETNAME); \
-		hid_t dataset_id = VERIFY(H5Dopen(config->file_id,DATASETNAME, H5P_DEFAULT)); \
+		hid_t dataset_id = VERIFY(H5Dopen2(config->file_id,DATASETNAME, H5P_DEFAULT)); \
 		hid_t dspace = VERIFY(H5Dget_space(dataset_id)); \
 		assert(H5Sget_simple_extent_ndims(dspace)==1); \
 		int atype  = H5Dget_type(dataset_id);  \
@@ -1032,9 +1124,9 @@ void ContextOpenForRead(ContextPtr config)
 		{
 		LOAD_CONFIG_DATASET(DATASET_PEDIGREE,Individual,individuals,individual_count);
 		}
-	if( config->on_read_load_pairs )
+	if( config->on_read_load_reskins )
 		{
-		LOAD_CONFIG_DATASET(DATASET_PAIRS,PairIndi,pairs,pair_count);
+		LOAD_CONFIG_DATASET(DATASET_RESKIN,Reskin,reskins,reskin_count);
 		}
 	}
 
@@ -1364,7 +1456,7 @@ IbdDataSetPtr IbdDataSetOpen(ContextPtr config)
 	hsize_t  dims_memory[3]={1,1,3};
 	IbdDataSetPtr ds=(IbdDataSetPtr)safeCalloc(1,sizeof(IbdDataSet));
 	DEBUG("Loading " DATASET_IBD); 
-	ds->dataset_id = VERIFY(H5Dopen(config->file_id,DATASET_IBD, H5P_DEFAULT)); 
+	ds->dataset_id = VERIFY(H5Dopen2(config->file_id,DATASET_IBD, H5P_DEFAULT)); 
 	ds->dataspace_id = VERIFY(H5Dget_space(ds->dataset_id)); 	
 	ds->memspace  = H5Screate_simple(3, dims_memory, NULL);
 	return ds;
