@@ -79,7 +79,20 @@ LDC PA33341 1 10 1 -9
 (...)
 ```
 
+
+* --reskin (path.reskin) An optional Reskin files. 
+
+```
+LDC	13	13	0	0	0	0	0	0	1	0	0
+LDC	13	18	0	0	0	0	0	0	0	0	1
+LDC	13	28	0	0	0	0	0	0	0	0	1
+LDC	13	34	0	0	0	0	0	0	0	0	1
+LDC	13	36	0	0	0	0	0	0	0	0	1
+```
+
+
 * --ibd (path.txt) A text file containing the **file path** to the IBD files.
+
 ```
 analysis_IBD/BLP10.ibd.gz
 analysis_IBD/BLP11.ibd.gz
@@ -154,6 +167,7 @@ FAM1
 0
 1
 ```
+
 
 
 All files can be g-zipped.

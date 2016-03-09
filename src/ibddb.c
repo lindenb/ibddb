@@ -1561,7 +1561,7 @@ int main_ibd(int argc,char** argv)
 	config->on_read_load_pairs = 1;
 	config->on_read_load_dict = 1;
 	config->on_read_load_markers = 1;
-	config->on_read_load_reskins = 1;
+	config->on_read_load_reskins = 0; /* will be set later */
 	
 
 	/** Graphics2D stuff */
@@ -1633,6 +1633,7 @@ int main_ibd(int argc,char** argv)
 					return EXIT_FAILURE;
 					}
 				check_reskin = TRUE;
+				config->on_read_load_reskins = 1;
 				break;
 				}
 			case 0: break;
@@ -1646,7 +1647,7 @@ int main_ibd(int argc,char** argv)
 		return EXIT_FAILURE;
 		}
 	
-	config->hdf5_filename=argv[optind];
+	config->hdf5_filename = argv[optind];
 	ContextOpenForRead(config);
 	
 	if(rgn_str!=NULL)
