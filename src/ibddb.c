@@ -782,7 +782,7 @@ static void readFaidx(ContextPtr ctx)
 		ChromPtr chrom=NULL;
 		char* tokens[3];
 		
-		if(strsplit(line,'\t',tokens,3)<3)
+		if(strsplit(line,'\t',tokens,3)<2)
 			{
 			DIE_FAILURE("BOUM FAIDX");
 			}
@@ -851,6 +851,45 @@ static void readFaidx(ContextPtr ctx)
 	//assertGE0(H5Dclose(faidx_dataset_id));*/
 	}
 
+
+static void readReskin(ContextPtr ctx)
+	{
+	char* line;
+	size_t line_len=0UL,nLines=0UL;
+	gzFile in;
+	if(ctx->reskin_filename==NULL)
+		{
+		fprintf(stderr,"[WARN] config->reskin_filename undefined.\n");
+		return;
+		}
+	in=safeGZOpen(ctx->reskin_filename,"r");
+	while((line=gzReadLine(in,&line_len))!=NULL)
+		{
+		IndividualPtr p1;
+		IndividualPtr p2;
+		PairIndi key;
+		char* tokens[12];
+		++nLines;
+		if(line[0]==0 || line[0]=='#')
+				{
+				free(line);
+				continue;
+				}
+		
+		if(strsplit(line,'\t',tokens,12)<12)
+				{
+				DIE_FAILURE("BOUM Reskin %s in %s line %"PRIuPTR,ctx->reskin_filename,line,nLines);
+				}
+		p1= findIndividualByFamName(ctx,tokens[0],tokens[1]);
+		p2= findIndividualByFamName(ctx,tokens[0],tokens[3]);
+
+		
+		free(line);
+		}
+	gzclose(in);
+	}
+
+
 ContextPtr ContextNew(int argc,char** argv)
 	{
 	ContextPtr config=(ContextPtr)safeCalloc(1,sizeof(Context));
@@ -870,6 +909,7 @@ static void build_usage(int argc,char** argv)
 	fputs(" -b|--bed      bed file of markers. Required.\n",stderr);
 	fputs(" -p|--ped      pedigree file. Required.\n",stderr);
 	fputs(" -i|--ibd      file containing path to IBD files. Required.\n",stderr);
+	fputs(" -r|--reskin   file containing path to Reskin files. Optional.\n",stderr);
 	fputs("\n\n",stderr);
 	}
 
@@ -893,11 +933,12 @@ int main_build(int argc,char** argv)
 			{"ped",    	required_argument, 0, 'p'},
 			{"pedigree",    required_argument, 0, 'p'},
 			{"ibd",         required_argument, 0, 'i'},
+			{"reskin",         required_argument, 0, 'r'},
 		       {0, 0, 0, 0}
 		     };
 		 /* getopt_long stores the option index here. */
 		int option_index = 0;
-	     	int c = getopt_long (argc, argv, "o:D:b:p:i:",
+	     	int c = getopt_long (argc, argv, "o:D:b:p:i:r:",
 		                    long_options, &option_index);
 		if(c==-1) break;
 		switch(c)
@@ -907,6 +948,7 @@ int main_build(int argc,char** argv)
 			case 'b': config->bed_filename=optarg;break;
 			case 'p': config->ped_filename=optarg;break;
 			case 'i': config->ibd_filename=optarg;break;
+			case 'r': config->reskin_filename=optarg;break;
 			case 0: break;
 			case '?': break;
 			default: exit(EXIT_FAILURE); break;
@@ -942,6 +984,7 @@ int main_build(int argc,char** argv)
 	readFaidx(config);
 	readBed(config);
 	readIbd(config);
+	readReskin(config);
 	DEBUG("Closing HDF5 file");
 	assertGE0(H5Fclose(config->file_id)); 
 	return EXIT_SUCCESS;

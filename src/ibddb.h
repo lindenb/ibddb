@@ -90,6 +90,7 @@ typedef struct context_t
 	char* bed_filename;
 	char* ped_filename;
 	char* ibd_filename;
+	char* reskin_filename;
 	hid_t       file_id;   /* HDF5 file identifier */
 
 	/** start time */
