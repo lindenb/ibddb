@@ -82,6 +82,7 @@ typedef struct region_id
 	} Region,*RegionPtr;
 
 #define RESKIN_COLUMN_COUNT 9
+#define RESKIN_COLUMN_IBD0  ( RESKIN_COLUMN_COUNT -1 )
 typedef struct reskin_id
 	{
 	int pair_id;

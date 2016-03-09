@@ -83,6 +83,21 @@ static int IndividualCompareByFamName(const void* a,const void *b)
 	return strcmp(i->name,  j->name);
 	}
 
+
+/**
+ * callback for sorting Reskin data on pair_id
+ *
+ */
+static int ReskinCompareByPairId(const void* a,const void *b)
+	{
+	const ReskinPtr i=(const ReskinPtr)a;
+	const ReskinPtr j=(const ReskinPtr)b;
+	int d= (i->pair_id -  j->pair_id);
+	return d;
+	}
+
+
+
 /**
  * Simple & stupid 'find chrom by name'.
  * Could be faster with a bsearch
@@ -811,7 +826,8 @@ static void readFaidx(ContextPtr ctx)
 	gzclose(in);
 	
 	{
-	 hsize_t  dims[1] = {ctx->chromosome_count};
+	
+	hsize_t  dims[1] = {ctx->chromosome_count};
 	int   strtype = H5Tcopy(H5T_C_S1);
 	H5Tset_size (strtype, H5T_VARIABLE);
 	
@@ -953,6 +969,15 @@ static void readReskin(ContextPtr ctx)
 	hid_t reskintype = H5Tcreate (H5T_COMPOUND, sizeof (Reskin));
     H5Tinsert(reskintype, "pair_id", HOFFSET(Reskin, pair_id), H5T_NATIVE_INT);
  	H5Tinsert(reskintype, "data", HOFFSET(Reskin, data),array_dt);
+	
+	if( ctx->reskin_count > 0 ) {
+		qsort(
+			(void*)ctx->reskins,
+			ctx->reskin_count,
+			sizeof (Reskin),
+			ReskinCompareByPairId
+			);
+		}
 	
 
 
@@ -1126,7 +1151,13 @@ void ContextOpenForRead(ContextPtr config)
 		}
 	if( config->on_read_load_reskins )
 		{
-		LOAD_CONFIG_DATASET(DATASET_RESKIN,Reskin,reskins,reskin_count);
+		/* old versions don't have reskins */
+		hid_t dataset_id = H5Dopen2(config->file_id,DATASET_RESKIN, H5P_DEFAULT);
+		if( dataset_id >= 0 )
+			{
+			VERIFY(H5Dclose(dataset_id));
+			LOAD_CONFIG_DATASET(DATASET_RESKIN,Reskin,reskins,reskin_count);
+			}
 		}
 	}
 
@@ -1491,6 +1522,7 @@ static void ibd_usage(int argc,char** argv)
 	fputs(" -p|--pair (fam1:name1|fam2:name2) restrict to that pair. Can be used multiple times.\n",stderr);
 	fputs(" -F|--family (fam) restrict to that family. Can be used multiple times.\n",stderr);
 	fputs(" --noselfself ignore all self-self pairs.\n",stderr);
+	fputs(" --reskin 'min/max' if defined and reskin data available, will restrict to pair having reskin ibd0 in this range .\n",stderr);
 	fprintf(stderr," --treshold (float) IBD TRESHOLD default:%f \n", DEFAULT_TRESHOLD_LIMIT);
 	fputs("\nTabular Options:\n\n",stderr);
 	fputs(" -noheader don't print data header.\n",stderr);
@@ -1513,6 +1545,10 @@ int main_ibd(int argc,char** argv)
 	ContextPtr config=ContextNew(argc,argv);
 	RegionPtr region=NULL;
 	char* rgn_str=NULL;
+	double min_reskin = -100000.0;
+	double max_reskin =  100000.0;
+	boolean_t check_reskin = FALSE;
+	
 	/** limit pedigree/pairs/family */
 	struct ArrayOfStrings limitIndividuals;
 	memset((void*)&limitIndividuals,0,sizeof(struct ArrayOfStrings));
@@ -1525,6 +1561,7 @@ int main_ibd(int argc,char** argv)
 	config->on_read_load_pairs = 1;
 	config->on_read_load_dict = 1;
 	config->on_read_load_markers = 1;
+	config->on_read_load_reskins = 1;
 	
 
 	/** Graphics2D stuff */
@@ -1536,6 +1573,7 @@ int main_ibd(int argc,char** argv)
 	size_t expData_count=0L;
 	double max_y=0.0;
 	char* image_filename=NULL;
+	
 	
 	if(argc==1)
 		{
@@ -1560,7 +1598,7 @@ int main_ibd(int argc,char** argv)
 			{"width",  required_argument, 0,1024},
 			{"height",  required_argument, 0,1025},
 			{"treshold",  required_argument, 0,1026},
-		
+		    {"reskin",  required_argument, 0,1027},
 			{0, 0, 0, 0}
 		     };
 		 /* getopt_long stores the option index here. */
@@ -1578,6 +1616,25 @@ int main_ibd(int argc,char** argv)
 			case 1024: imageDimension.width = atoi(optarg);break;
 			case 1025: imageDimension.height = atoi(optarg);break;
 			case 1026: treshold = atof(optarg);break;
+			case 1027:
+				{
+				char* p2;
+				char* slash = strchr(optarg,'/');
+				if(slash==NULL)
+					{
+					fprintf(stderr,"slash (/) missing in option reskin %s\n",optarg);
+					return EXIT_FAILURE;
+					}
+				min_reskin = strtod(optarg,&p2);
+				max_reskin = strtod(slash+1,&p2);
+				if(min_reskin > max_reskin || min_reskin<0.0 || max_reskin>1.0)
+					{
+					fprintf(stderr,"bad min/max in option reskin %s\n",optarg);
+					return EXIT_FAILURE;
+					}
+				check_reskin = TRUE;
+				break;
+				}
 			case 0: break;
 			case '?': break;
 			default: exit(EXIT_FAILURE); break;
@@ -1617,6 +1674,33 @@ int main_ibd(int argc,char** argv)
 			pair->selected=FALSE;
 			continue;
 			}
+		
+		/* ask to check reskin data */
+		if( check_reskin )
+			{
+			int j;
+			ReskinPtr reskin = NULL;
+			/** find this pair in reskin data (todo: use qsearch ) */
+			for(j=0;j< config->reskin_count;++j)
+				{
+				if( pair->index == config->reskins[j].pair_id )
+					{
+					reskin = &(config->reskins[j]);
+					break;
+					}
+				}
+			/* pair not found or reskin_ibd0 out of bound */
+			if( reskin == NULL ||
+				reskin->data[RESKIN_COLUMN_IBD0] < min_reskin ||
+				reskin->data[RESKIN_COLUMN_IBD0] > max_reskin
+				) {
+				pair->selected=FALSE;
+				continue;
+				}
+			
+			}
+		
+		
 		//check families
 		if(limitFamilies.size>0)
 			{
