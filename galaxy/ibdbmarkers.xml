@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <tool hidden="false" id="ibddbmarkers" version="1.0" name="ibddb::markers">
   <description>Dump Markers from IBDDB H5 database</description>
+  <requirements>
+    <requirement type="set_environment">IBDDBBIN</requirement>
+  </requirements>
   <macros>
     <import>macros.xml</import>
   </macros>
-  <command>/home/lindenb/src/ibddb/bin/ibddb markers ${input} &gt; ${output}</command>
+  <command>$IBDDBBIN markers ${input} &gt; ${output}</command>
   <inputs>
     <param format="h5" name="input" type="data" label="IBDDB H5 file"/>
   </inputs>

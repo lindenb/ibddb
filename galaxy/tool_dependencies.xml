@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tool_dependency>
+	<package name="ibddb" version="20160310">
+		<install version="1.0">
+			<actions>
+			
+				<action type="shell_command">git clone -b reskin "https://github.com/lindenb/ibddb.git" ibddb</action>
+				
+				
+				<action type="move_directory_files">
+					<source_directory>.</source_directory>
+					<destination_directory>$REPOSITORY_INSTALL_DIR</destination_directory>
+				</action>
+				<action type="shell_command">make -C $REPOSITORY_INSTALL_DIR/src -f $REPOSITORY_INSTALL_DIR/src/Makefile ../bin/ibddb</action>
+			
+			</actions>
+		</install>
+		<readme>Storing and Querying **IBD** status in a **HDF5** database.
+
+**HDF5** is a data model, library, and file format for storing and managing data. It supports an unlimited variety of datatypes, and is designed for flexible and efficient I/O and for high volume and complex data
+
+		</readme>
+	</package>
+	
+	 <set_environment version="1.0">
+        <environment_variable name="IBDDB_DIR" action="set_to">$REPOSITORY_INSTALL_DIR</environment_variable>
+        <environment_variable name="IBDDBBIN" action="set_to">$REPOSITORY_INSTALL_DIR/bin/ibddb</environment_variable>
+    </set_environment> 
+    
+</tool_dependency>

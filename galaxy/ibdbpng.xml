@@ -1,10 +1,13 @@
 <?xml version="1.0"?>
 <tool hidden="false" id="ibddbpng" version="1.0" name="ibddb::png">
   <description>Query IBDDB H5 database (Image/PNG output)</description>
+  <requirements>
+    <requirement type="set_environment">IBDDBBIN</requirement>
+  </requirements>
   <macros>
     <import>macros.xml</import>
   </macros>
-  <command>/home/lindenb/src/ibddb/bin/ibddb ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
+  <command>$IBDDBBIN ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
 #if $families
  --familyfile '${$families}'
 #end if
