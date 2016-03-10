@@ -9,7 +9,7 @@
   </macros>
   <command>$IBDDBBIN ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
 #if $families
- --familyfile '${$families}'
+ --familyfile '${families}'
 #end if
 #if $individuals
  --individualfile '${individuals}'
