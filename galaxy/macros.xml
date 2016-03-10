@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<macros>
+
+  <xml name="query">
+     <param name="treshold" type="float" min="0.0" max="1.0" value="0.1" label="IBD TRESHOLD" />
+     <param name="region" type="text" value="" label="Region" help="Region: empty or 'chr' or 'chr:start-end' " optional="true"/>
+     <param name="families" type="data" format="tabular" label="Families" help="Restrict to those families. File contains one column with the family name" optional="true"/>
+     <param name="individuals" type="data" format="tabular" label="Individuals" help="Restrict to those individuals. Tab delimited file contains 2 columns: family and name " optional="true"/>
+     <param name="pairs" type="data" format="tabular" label="Pairs" help="Restrict to those pairs. Tab delimited file contains 4 columns: family1 , name1, family2 and name2 " optional="true"/>
+     <param name="noselfself" type="boolean" label="noself" help="ignore all self-self pairs" checked="true" truevalue="--noselfself" falsevalue=""/>
+  </xml>
+  <xml name="about">
+See   https://github.com/lindenb/ibddb for more information.
+  
+**Author**
+
+Pierre Lindenbaum PhD. @yokofakun. Institut du Thorax, U1087, 44000 Nantes.
+
+**Report bugs / Contribute**
+
+https://github.com/lindenb/ibddb/issues
+
+**License**
+
+The project is licensed under the MIT license.
+  </xml>
+  <xml name="inputh5">
+  	<param format="h5" name="input" type="data" label="IBDDB H5 file"/>
+  </xml>
+  <xml name="cite">
+  	
+  </xml>
+   <xml name="stdio">
+  	<stdio>
+    <exit_code range="1:"/>
+    <exit_code range=":-1"/>
+   </stdio>
+  </xml>
+</macros>

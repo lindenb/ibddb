@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<tool hidden="false" id="ibddbbuild" version="1.0" name="ibddb::build">
+  <description>Build IBDDB H5 database</description>
+  <command>rm -f '${output}.list';
+#for $i,$ibdf in enumerate( $ibdlist )
+	 echo '${ibdf.ibd.file_name}' &gt;&gt; '${output}.list' ;
+#end for
+/home/lindenb/src/ibddb/bin/ibddb build --dict '${dict}'  --bed '${bed}'  --ped '${ped}' --ibd '${output}.list' -o '${output}.h5' &amp;&amp; cp '${output}.h5' '${output}'  &amp;&amp; rm -f '${output}.list' </command>
+  <inputs>
+    <param format="txt,tabular" name="dict" type="data" label="Genome Dictionary: chrom and length"/>
+    <param format="bed" name="bed" type="data" label="bed file of markers"/>
+    <param format="lped,tabular,txt" name="ped" type="data" label="Pedigree file"/>
+    <repeat name="ibdlist" min="1" title="IBD List">
+    	<param format="txt,tabular" name="ibd" type="data" label="IBD file"/>
+    </repeat>
+  </inputs>
+  <outputs>
+    <data format="h5" name="output"/>
+  </outputs>
+  <stdio>
+    <exit_code range="1:"/>
+    <exit_code range=":-1"/>
+  </stdio>
+  <help>
+See   https://github.com/lindenb/ibddb for more information.
+  
+**Author**
+
+Pierre Lindenbaum PhD. @yokofakun. Institut du Thorax, U1087, 44000 Nantes.
+
+**Report bugs / Contribute**
+
+https://github.com/lindenb/ibddb/issues
+
+**License**
+
+The project is licensed under the MIT license.
+</help>
+</tool>

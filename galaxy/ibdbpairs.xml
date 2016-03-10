@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<tool hidden="false" id="ibddbpairs" version="1.0" name="ibddb::pairs">
+  <description>Dump Pairs from IBDDB H5 database</description>
+  <macros>
+    <import>macros.xml</import>
+  </macros>
+  <command>/home/lindenb/src/ibddb/bin/ibddb pairs ${input} &gt; ${output}</command>
+  <inputs>
+    <expand macro="inputh5"/>
+  </inputs>
+  <outputs>
+    <data format="tabular" name="output"/>
+  </outputs>
+  <expand macro="stdio"/>
+  <help>
+   <expand macro="about"/>
+  </help>
+  <expand macro="cite"/>
+</tool>

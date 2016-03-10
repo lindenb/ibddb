@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<tool hidden="false" id="ibddbmarkers" version="1.0" name="ibddb::markers">
+  <description>Dump Markers from IBDDB H5 database</description>
+  <macros>
+    <import>macros.xml</import>
+  </macros>
+  <command>/home/lindenb/src/ibddb/bin/ibddb markers ${input} &gt; ${output}</command>
+  <inputs>
+    <param format="h5" name="input" type="data" label="IBDDB H5 file"/>
+  </inputs>
+  <outputs>
+    <data format="tabular" name="output"/>
+  </outputs>
+  <expand macro="stdio"/>
+  <help>
+   <expand macro="about"/>
+  </help>
+  <expand macro="cite"/>
+</tool>

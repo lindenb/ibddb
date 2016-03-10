@@ -874,9 +874,9 @@ static void readReskin(ContextPtr ctx)
 	if(ctx->reskin_filename==NULL)
 		{
 		fprintf(stderr,"[WARN] config->reskin_filename undefined.\n");
+		return;
 		}
-	else
-		{
+
 		int i;
 		PairIndiPtr found = NULL;
 		ReskinPtr last = NULL;
@@ -959,8 +959,9 @@ static void readReskin(ContextPtr ctx)
 			free(line);
 			}
 		gzclose(in);
-		}
-	
+		
+	if( ctx->reskin_count == 0) return;
+
 	{
 	hsize_t  dims[1] = {ctx->reskin_count};
 	hsize_t  array_dim[1] = {RESKIN_COLUMN_COUNT};
@@ -1149,6 +1150,12 @@ void ContextOpenForRead(ContextPtr config)
 		{
 		LOAD_CONFIG_DATASET(DATASET_PEDIGREE,Individual,individuals,individual_count);
 		}
+	
+	if( config->on_read_load_pairs )
+		{
+		LOAD_CONFIG_DATASET(DATASET_PAIRS,PairIndi,pairs,pair_count);
+		}
+	
 	if( config->on_read_load_reskins )
 		{
 		/* old versions don't have reskins */
@@ -1512,6 +1519,97 @@ struct ArrayOfStrings
 	a.data[a.size]=s;\
 	a.size++	
 
+/** read pairs ad convert fam1(tab)name1(tab)fam2(tab)name2  to (fam1:name1|fam2:name2)  */
+static void selectPairsFromFile(struct ArrayOfStrings* list,const char* filename)
+	{
+	char* p;
+	char* line;
+	size_t line_len=0UL;
+	gzFile in;
+	in = safeGZOpen(filename,"r");
+	while((line = gzReadLine(in,&line_len)) != NULL) {
+		if(line[0]=='#' )
+			{
+			free(line);
+			continue;
+			}
+		p = strchr(line,'\t');
+		if(p==NULL || p==line)  {
+			fprintf(stderr,"Error in file %s cannot find 1st tabulation in line %s\n",filename,line);
+			DIE_FAILURE("INPUT ERROR");
+			}
+		/* replace tab by colon */
+		*p=':';
+		p = strchr(p,'\t');
+		if(p==NULL )  {
+			fprintf(stderr,"Error in file %s cannot find 2nd tabulation in line %s\n",filename,line);
+			DIE_FAILURE("INPUT ERROR");
+			}
+		/* replace tab by pipe */
+		*p='|';
+		p = strchr(p,'\t');
+		if(p==NULL )  {
+			fprintf(stderr,"Error in file %s cannot find 3rd tabulation in line %s\n",filename,line);
+			DIE_FAILURE("INPUT ERROR");
+			}
+		/* replace tab by colon */
+		*p=':';
+		
+		
+		if((list->data=(char**)safeRealloc(list->data,(list->size+1)*sizeof(char*)))==NULL)  DIE_FAILURE("OUT OF MEMORY");
+		list->data[list->size] = line;
+		list->size++;
+		}
+	gzclose(in);
+	}
+
+/** read fam(tab)name and convert to (fam:name) */
+static void selectIndividualsFromFile(struct ArrayOfStrings* list,const char* filename)
+	{
+	char* p;
+	char* line;
+	size_t line_len=0UL;
+	gzFile in;
+	in = safeGZOpen(filename,"r");
+	while((line = gzReadLine(in,&line_len)) != NULL) {
+		if(line[0]=='#' )
+			{
+			free(line);
+			continue;
+			}
+		p = strchr(line,'\t');
+		if(p==NULL || p==line)  {
+			fprintf(stderr,"Error in file %s cannot find tabulation in line %s\n",filename,line);
+			DIE_FAILURE("INPUT ERROR");
+			}
+		/* replace tab by colon */
+		*p=':';
+		if((list->data=(char**)safeRealloc(list->data,(list->size+1)*sizeof(char*)))==NULL)  DIE_FAILURE("OUT OF MEMORY");
+		list->data[list->size] = line;
+		list->size++;
+		}
+	gzclose(in);
+	}
+
+static void selectFamiliesFromFile(struct ArrayOfStrings* list,const char* filename)
+	{
+	char* line;
+	size_t line_len=0UL;
+	gzFile in;
+	in = safeGZOpen(filename,"r");
+	while((line = gzReadLine(in,&line_len)) != NULL) {
+		if(line_len==0 || line[0]=='#' )
+			{
+			free(line);
+			continue;
+			}
+		if((list->data=(char**)safeRealloc(list->data,(list->size+1)*sizeof(char*)))==NULL)  DIE_FAILURE("OUT OF MEMORY");
+		list->data[list->size] = line;
+		list->size++;
+		}
+	gzclose(in);
+	}
+
 static void ibd_usage(int argc,char** argv)
 	{
 	USAGE_PREAMBLE;
@@ -1519,8 +1617,11 @@ static void ibd_usage(int argc,char** argv)
 	fputs("Options:\n\n",stderr);
 	fputs(" -r|--region (chr|chr:start-end) restrict to that region. Optional.\n",stderr);
 	fputs(" -i|--individual (fam:name) restrict to that individual. Can be used multiple times.\n",stderr);
+	fputs(" -I|--individualfile (file): tab delimited file containing fam\\tname\\n to restrict to those individuals.n",stderr);
 	fputs(" -p|--pair (fam1:name1|fam2:name2) restrict to that pair. Can be used multiple times.\n",stderr);
+	fputs(" -P|--pairfile (file):   tab delimited file containing : fam1\\tname1\\tfam2\\tname2\\n to restrict to those pairs.\n",stderr);
 	fputs(" -F|--family (fam) restrict to that family. Can be used multiple times.\n",stderr);
+	fputs(" -Y|--familyfile (file) read file to restrict to thoses families. Can be used multiple times.\n",stderr);
 	fputs(" --noselfself ignore all self-self pairs.\n",stderr);
 	fputs(" --reskin 'min/max' if defined and reskin data available, will restrict to pair having reskin ibd0 in this range .\n",stderr);
 	fprintf(stderr," --treshold (float) IBD TRESHOLD default:%f \n", DEFAULT_TRESHOLD_LIMIT);
@@ -1592,8 +1693,11 @@ int main_ibd(int argc,char** argv)
 			{"nopairsinheader",  no_argument, &print_pairs, 0},
 			{"image",  required_argument, 0, 'g'},
 			{"individual",  required_argument, 0, 'i'},
+			{"individualfile",  required_argument, 0, 'I'},
 			{"pair",  required_argument, 0, 'p'},
+			{"pairfile",  required_argument, 0, 'P'},
 			{"family",  required_argument, 0, 'F'},
+			{"familyfile",  required_argument, 0, 'Y'},
 			{"noselfself", no_argument, &allow_self_self, 0},
 			{"width",  required_argument, 0,1024},
 			{"height",  required_argument, 0,1025},
@@ -1603,7 +1707,7 @@ int main_ibd(int argc,char** argv)
 		     };
 		 /* getopt_long stores the option index here. */
 		int option_index = 0;
-	     	int c = getopt_long (argc, argv, "r:g:i:p:F:",
+	     	int c = getopt_long (argc, argv, "r:g:i:p:F:I:P:Y:",
 		                    long_options, &option_index);
 		if(c==-1) break;
 		switch(c)
@@ -1611,8 +1715,11 @@ int main_ibd(int argc,char** argv)
 			case 'r': rgn_str = optarg ;break;
 			case 'g': image_filename = optarg ;break;
 			case 'i': PUSH_STR_TO_ARRAY(limitIndividuals,optarg);break;
+			case 'I': selectIndividualsFromFile(&limitIndividuals,optarg); break;
 			case 'p': PUSH_STR_TO_ARRAY(limitPairs,optarg);break;
+			case 'P': selectPairsFromFile(&limitPairs,optarg); break;
 			case 'F': PUSH_STR_TO_ARRAY(limitFamilies,optarg);break;
+			case 'Y': selectFamiliesFromFile(&limitFamilies,optarg); break;
 			case 1024: imageDimension.width = atoi(optarg);break;
 			case 1025: imageDimension.height = atoi(optarg);break;
 			case 1026: treshold = atof(optarg);break;
@@ -1649,6 +1756,7 @@ int main_ibd(int argc,char** argv)
 	
 	config->hdf5_filename = argv[optind];
 	ContextOpenForRead(config);
+	
 	
 	if(rgn_str!=NULL)
 		{
@@ -1795,7 +1903,7 @@ int main_ibd(int argc,char** argv)
 	if(print_header && image_filename==NULL)
 		{
 		fputs("CHROM\tPOS\tNAME",config->out);
-		for(i=0;i< config->pair_count && print_pairs;++i)
+		for(i=0;i< config->pair_count && print_pairs!=0;++i)
 			{
 			PairIndiPtr pair = &config->pairs[i];
 			if(!pair->selected) continue;

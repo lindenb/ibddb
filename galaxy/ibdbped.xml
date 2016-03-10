@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<tool hidden="false" id="ibddbped" version="1.0" name="ibddb::ped">
+  <description>Dump Pedigree from IBDDB H5 database</description>
+  <macros>
+    <import>macros.xml</import>
+  </macros>
+  <command>/home/lindenb/src/ibddb/bin/ibddb ped ${input} &gt; ${output}</command>
+  <inputs>
+  	<expand macro="inputh5"/>
+  </inputs>
+  <outputs>
+    <data format="tabular" name="output"/>
+  </outputs>
+  <expand macro="stdio"/>
+  <help>
+   <expand macro="about"/>
+  </help>
+  <expand macro="cite"/>
+</tool>

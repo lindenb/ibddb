@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<tool hidden="false" id="ibddbpng" version="1.0" name="ibddb::png">
+  <description>Query IBDDB H5 database (Image/PNG output)</description>
+  <macros>
+    <import>macros.xml</import>
+  </macros>
+  <command>/home/lindenb/src/ibddb/bin/ibddb ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
+#if $families
+ --familyfile '${$families}'
+#end if
+#if $individuals
+ --individualfile '${individuals}'
+#end if
+#if $pairs
+ --pairfile '${pairs}'
+#end if
+#if $region
+ --region '${region}'
+#end if
+${input} --image '${output}'</command>
+  <inputs>
+  	<expand macro="inputh5"/>
+    <expand macro="query"/>
+    <param name="width" type="integer" label="Width" help="Image Width" min="100" max="5000" value="2000"/>
+    <param name="height" type="integer" label="Height" help="Image Height"  min="100" max="5000" value="500"/>
+  </inputs>
+  <outputs>
+    <data format="png" name="output"/>
+  </outputs>
+  <expand macro="stdio"/>
+  <help>
+   <expand macro="about"/>
+  </help>
+  <expand macro="cite"/>
+</tool>
