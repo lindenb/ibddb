@@ -234,6 +234,15 @@ GROUP "/" {
 * --noselfself ignore all self-self pairs.
 * --treshold (float) IBD TRESHOLD default:0.100000 
 
+new in 2016:
+
+* -I|--individualfile (file): tab delimited file containing fam\tname\n to restrict to those individuals.n -p|--pair (fam1:name1|fam2:name2) restrict to that pair. Can be used multiple times.
+* -P|--pairfile (file):   tab delimited file containing : fam1\tname1\tfam2\tname2\n to restrict to those pairs.
+* -Y|--familyfile (file) read file to restrict to thoses families. Can be used multiple times.
+* --reskin 'min/max' if defined and reskin data available, will restrict to pair having reskin ibd0 in this range .
+
+
+
 Tabular options
 
 * --noheader don't print data header
@@ -443,6 +452,7 @@ $ ibddb dict test.h5
 ```
 # R Interface
 
+```
 > Opens an IBD-DB HDF5 file
 >
 > @param filename the HDF5 file
@@ -451,7 +461,9 @@ $ ibddb dict test.h5
 > @examples
 > ibd.open('file.h5')
 ibd.open<-function(filename)
+```
 
+```
 > Close an ibd context and realease the associated resources
 >
 > @param ibd the IBD context
@@ -459,35 +471,45 @@ ibd.open<-function(filename)
 > @examples
 > ibd.close(ibd)
 ibd.close<-function(ibd)
+```
 
+```
 > returns the number of markers in the IBD context
 >
 > @param ibd the IBD context
 > @keywords ibd
 > @return the number of markers
 ibd.num.markers<-function(ibd)
+```
 
+```
 > returns the number of chromosomes in the IBD context
 >
 > @param ibd the IBD context
 > @keywords ibd
 > @return the number of chromosomes
 ibd.num.chromosomes<-function(ibd)
+```
 
+```
 > returns the number of pairs in the IBD context
 >
 > @param ibd the IBD context
 > @keywords ibd
 > @return the number of pairs
 ibd.num.pairs<-function(ibd)
+```
 
+```
 > returns the number of individuals in the IBD context
 >
 > @param ibd the IBD context
 > @keywords ibd
 > @return the number of individuals
 ibd.num.individuals<-function(ibd)
+```
 
+```
 > returns the index-th chromosome in the IBD context. Chromosome are ordered on the original sequence dictionary
 > A chromosome is a tuple (name,tid,length)
 > @param ibd the IBD context
@@ -495,7 +517,9 @@ ibd.num.individuals<-function(ibd)
 > @keywords ibd
 > @return the index-th chromosome	
 ibd.chromosome<-function(ibd,index)
+```
 
+```
 > returns the index-th marker in the IBD context. Markers are ordered on the tid,position
 > A marker is a tuple (name,chromosome-index,position,self-index)
 > @param ibd the IBD context
@@ -503,7 +527,9 @@ ibd.chromosome<-function(ibd,index)
 > @keywords ibd
 > @return the index-th marker	
 ibd.marker<-function(ibd,index)
+```
 
+```
 > returns the index-th pair of individual in the IBD context
 > A pair is a tuple (individual1-index,individual2-index,self-index)
 > @param ibd the IBD context
@@ -511,7 +537,9 @@ ibd.marker<-function(ibd,index)
 > @keywords ibd
 > @return the index-th pair	
 ibd.pair<-function(ibd,index)
+```
 
+```
 > returns the index-th pair of individual in the IBD context
 > A pair is a tuple (individual1-index,individual2-index,self-index)
 > @param ibd the IBD context
@@ -519,7 +547,9 @@ ibd.pair<-function(ibd,index)
 > @keywords ibd
 > @return the index-th pair
 ibd.individual<-function(ibd,index)
+```
 
+```
 > returns the IBD-0 status for the given marker-index,pair-index
 > @param ibd the IBD context
 > @param marker-index 0-based index of the marker
@@ -527,7 +557,9 @@ ibd.individual<-function(ibd,index)
 > @keywords ibd 
 > @return the IBD-0 (or null if undefined)
 ibd.ibd0<-function(ibd,marker_y,pair_x)
+```
 
+```
 > returns the IBD-1 status for the given marker-index,pair-index
 > @param ibd the IBD context
 > @param marker-index 0-based index of the marker
@@ -535,7 +567,9 @@ ibd.ibd0<-function(ibd,marker_y,pair_x)
 > @keywords ibd 
 > @return the IBD-1 (or null if undefined)
 ibd.ibd1<-function(ibd,marker_y,pair_x)
+```
 
+```
 > returns the IBD-2 status for the given marker-index,pair-index
 > @param ibd the IBD context
 > @param marker-index 0-based index of the marker
@@ -543,7 +577,7 @@ ibd.ibd1<-function(ibd,marker_y,pair_x)
 > @keywords ibd 
 > @return the IBD-2 (or null if undefined)
 ibd.ibd2<-function(ibd,marker_y,pair_x)
-
+```
 
 ## Example
 
@@ -599,6 +633,7 @@ ibd.close(ibd);
 
 # History
 
+* 2016-03: reskin
 * 2015-03: new version of ibdld
 * 2014 1st version
 
