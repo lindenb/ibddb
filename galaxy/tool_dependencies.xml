@@ -4,7 +4,7 @@
 		<install version="1.0">
 			<actions>
 			
-				<action type="shell_command">git clone -b reskin "https://github.com/lindenb/ibddb.git" ibddb</action>
+				<action type="shell_command">git clone "https://github.com/lindenb/ibddb.git" ibddb</action>
 				
 				
 				<action type="move_directory_files">
