@@ -7,7 +7,7 @@
   <macros>
     <import>macros.xml</import>
   </macros>
-  <command>$IBDDBBIN pairs ${input} &gt; ${output}</command>
+  <command>\$IBDDBBIN pairs ${input} &gt; ${output}</command>
   <inputs>
     <expand macro="inputh5"/>
   </inputs>

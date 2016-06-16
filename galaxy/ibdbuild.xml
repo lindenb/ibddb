@@ -8,7 +8,7 @@
 #for $i,$ibdf in enumerate( $ibdlist )
 	 echo '${ibdf.ibd.file_name}' &gt;&gt; '${output}.list' ;
 #end for
-$IBDDBBIN build --dict '${dict}'  --bed '${bed}'  --ped '${ped}' --ibd '${output}.list' -o '${output}.h5' &amp;&amp; cp '${output}.h5' '${output}'  &amp;&amp; rm -f '${output}.list' </command>
+\$IBDDBBIN build --dict '${dict}'  --bed '${bed}'  --ped '${ped}' --ibd '${output}.list' -o '${output}.h5' &amp;&amp; cp '${output}.h5' '${output}'  &amp;&amp; rm -f '${output}.list' </command>
   <inputs>
     <param format="txt,tabular" name="dict" type="data" label="Genome Dictionary: chrom and length"/>
     <param format="bed" name="bed" type="data" label="bed file of markers"/>

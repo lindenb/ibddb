@@ -7,7 +7,7 @@
   <macros>
     <import>macros.xml</import>
   </macros>
-  <command>$IBDDBBIN ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
+  <command>\$IBDDBBIN ibd --width ${width} --height ${height} --treshold ${treshold} ${noselfself}
 #if $families
  --familyfile '${families}'
 #end if

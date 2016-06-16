@@ -7,7 +7,7 @@
   <macros>
     <import>macros.xml</import>
   </macros>
-  <command>$IBDDBBIN markers ${input} &gt; ${output}</command>
+  <command>\$IBDDBBIN markers ${input} &gt; ${output}</command>
   <inputs>
     <param format="h5" name="input" type="data" label="IBDDB H5 file"/>
   </inputs>
