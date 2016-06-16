@@ -1,26 +1,21 @@
 .PHONY : all clean test
 export LD_LIBRARY_PATH
 
-ifeq (${HDF5HOME},)
-$(warning variable HDF5HOME is not defined. On kaamelot, could be HDF5HOME=/commun/data/packages/hdf5 )
-endif
-
 ifeq (${R_HOME},)
 $(warning variable R_HOME is not defined. On kaamelot, could be R_HOME=/commun/data/packages/R/R-3.1.1/R-3.1.1 )
 endif
 
 
-CC=gcc
-CFLAGS= -fPIC $(if ${HDF5HOME},-I${HDF5HOME}/include) -g -Wall `pkg-config --cflags cairo` $(if ${R_HOME},-I${R_HOME}/include )
-LIBS=$(if ${HDF5HOME},-L${HDF5HOME}/lib) -L../lib -lz -lm `pkg-config  --libs cairo` -lhdf5
-#-I${HDF5HOME}/include `pkg-config --cflags cairo`  
+CC=h5cc
+CFLAGS= -fPIC -g -Wall `pkg-config --cflags cairo` $(if ${R_HOME},-I${R_HOME}/include )
+LIBS=-L../lib -lz -lm `pkg-config  --libs cairo`
 
 all:../bin/ibddb ../lib/libibddb.so
 	R --vanilla  < test.R
 
 ../bin/ibddb : ibddb_main.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)  $(LIBS)
+	$(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)
 
 ../lib/libibddb.so : ibddbR.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
