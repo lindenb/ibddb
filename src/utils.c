@@ -140,7 +140,7 @@ void* _safeMalloc(const char* fname,int line, size_t size)
 	void * ptr=malloc(size);
 	if(ptr==NULL)
 		{
-		DIE_FAILURE("Out of memory \"%s\":%d  N=%ld.\n",
+		DIE_FAILURE("Out of memory \"%s\":%d  N=%zu.\n",
 			fname,line,size
 			);
 		}
@@ -152,7 +152,7 @@ void* _safeCalloc(const char* fname,int line, size_t n,size_t size)
 	void * ptr=calloc(n,size);
 	if(ptr==NULL)
 		{
-		DIE_FAILURE("Out of memory \"%s\":%d N=%ld*%ld.\n",
+		DIE_FAILURE("Out of memory \"%s\":%d N=%zu*%zu.\n",
 			fname,line,n,size
 			);
 		}
@@ -164,7 +164,7 @@ void* _safeRealloc(const char* fname,int line, void* ptr,size_t size)
 	ptr=realloc(ptr,size);
 	if(ptr==NULL)
 		{
-		DIE_FAILURE("Out of memory \"%s\":%d N=%ld\n",
+		DIE_FAILURE("Out of memory \"%s\":%d N=%zu\n",
 			fname,line,size
 			);
 		}
