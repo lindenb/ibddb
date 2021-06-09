@@ -11,7 +11,6 @@ CFLAGS= -fPIC -g -Wall `pkg-config --cflags cairo` $(if ${R_HOME},-I${R_HOME}/in
 LIBS=-L../lib -lz -lm `pkg-config  --libs cairo`
 
 all:../bin/ibddb ../lib/libibddb.so
-	R --vanilla  < test.R
 
 ../bin/ibddb : ibddb_main.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
