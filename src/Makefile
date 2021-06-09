@@ -15,11 +15,11 @@ all:../bin/ibddb ../lib/libibddb.so
 
 ../bin/ibddb : ibddb_main.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
-	$(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)
+	HDF5_USE_SHLIB=yes $(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)
 
 ../lib/libibddb.so : ibddbR.o utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
-	$(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^ ${LIBS}
+	HDF5_USE_SHLIB=yes $(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^ ${LIBS}
 
 ibddbR.o :  ibddbR.c ibddb.h utils.h githash.h
 	$(CC) $(CFLAGS) -c -o $@  $<
