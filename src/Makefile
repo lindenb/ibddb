@@ -16,7 +16,7 @@ all:../bin/ibddb ../lib/libibddb.so
 	mkdir -p $(dir $@) && \
 	HDF5_USE_SHLIB=yes $(CC) -o $@ $^ $(LDFLAGS)  $(LIBS)
 
-../lib/libibddb.so : ibddbR.o utils.o ibddb.o hershey.o
+../lib/libibddb.so : $(if ${R_HOME},ibddbR.o) utils.o ibddb.o hershey.o
 	mkdir -p $(dir $@) && \
 	HDF5_USE_SHLIB=yes $(CC) -fPIC -shared -Wl,-soname,$(basename $@) -o $@ $^ ${LIBS}
 
